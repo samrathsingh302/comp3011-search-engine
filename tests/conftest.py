@@ -6,7 +6,15 @@ from pathlib import Path
 
 import pytest
 
+from src.indexer import InvertedIndex
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def index() -> InvertedIndex:
+    """A fresh InvertedIndex per test, with default options."""
+    return InvertedIndex()
 
 
 @pytest.fixture

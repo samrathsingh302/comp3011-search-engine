@@ -158,3 +158,35 @@ A running log of design choices made during the build. Each entry captures the d
 **Rationale**:
 - 2000 characters is large enough to comfortably hold three or four sentences of context around any matched term, and small enough that 100 pages worth of cache fits in well under a megabyte. The snippet renderer in Session 3.2 will slice from this cache rather than re-parsing the HTML, which keeps `search.find()` fast even for 10-result responses.
 - Declaring the constant now means the indexer can populate the cache when documents are added, with no second pass over the corpus.
+
+## 2026-05-18 — Posting schema: frequency + positions + in_title
+
+**Decision**: Every posting is `{"frequency": int, "positions": list[int], "in_title": bool}`. None of these three fields is redundant: they each unlock a downstream capability that the other two cannot.
+
+**Alternatives considered**:
+- `index[term] = set[url]` (one bit of information per posting; cannot rank, cannot snippet, cannot field-weight);
+- `index[term][url] = int` (frequency only — enough for TF-IDF, but blocks phrase proximity and snippets);
+- A separate `title_index` and `body_index` (clean field separation, but doubles the structure and forces ranker code to look up the same term twice).
+
+**Rationale**:
+- **`frequency`** is the count of occurrences, consumed directly by TF-IDF and by the BM25 numerator. It is `len(positions)` by construction but storing it explicitly avoids recomputing it in the hot ranking loop.
+- **`positions`** is the list of positional offsets (title positions in `[0, len(title_tokens))`, body positions starting at `title_position_gap`). The Session 3.2 proximity boost takes the min span across query terms; the snippet generator slices `body_excerpt` around the matched positions; phrase queries (out of scope but possible) need full positions to detect adjacency.
+- **`in_title`** is a single bool per `(term, url)` posting that promotes to True if any occurrence was in the title. The Session 3.2 ranker uses it for the 2.0x title boost. Storing it on the posting avoids re-scanning positions and comparing each one against the gap.
+- **Single index with positional offsets** (rather than per-field indices) follows the Lecture 12 "extents" pattern: one structure, positions encode the field, and ranking code reads a single dict.
+
+## 2026-05-18 — Body excerpt cap = 2 KB per document
+
+**Decision**: `documents[url]["body_excerpt"] = body_text[:BODY_EXCERPT_CHARS]` with `BODY_EXCERPT_CHARS = 2000`.
+
+**Storage cost**: ~2 KB per page. At the ~60-page corpus produced by a polite crawl of `quotes.toscrape.com`, that is **~120 KB** of excerpt cache, which is a few percent of the overall index file size and irrelevant on disk and in memory.
+
+**Alternatives considered**:
+- Store the full extracted body (~10 KB per page on this corpus → ~600 KB total, but no upper bound on a less friendly site);
+- Store only matched-token positions and re-extract HTML on every snippet request (slow: `extract_visible_text` is O(N) over the HTML, called per result during `find`);
+- Drop the cache entirely and have snippets be plain "found at position 1234" debug strings (technically meets the brief but loses the user-facing snippet quality the 80-100 band rewards).
+
+**Rationale**: A 2 KB excerpt comfortably holds three or four sentences of context around any matched term. The slice is taken from the already-extracted `body_text`, so the cost is one extra string copy per `add_document` call (microseconds). The snippet renderer in Session 3.2 will slice from this cache by position, avoiding any HTML reparse during search.
+
+**AI note**: Two genuine catches in this session before pytest could surface them.
+- **`extract_visible_text` was duplicating title text into the body.** `BeautifulSoup.get_text()` traverses `<head>` too, so the visible-text extractor was returning `<title>` content alongside body content. Combined with `add_document` tokenising title and body separately, every title term would have appeared twice in the index (once at position 0, once at position 1000), inflating frequencies and confusing position semantics. Fixed by adding `head` to the decompose list inside `extract_visible_text`. This widens the Session 2.1 helper's contract slightly but keeps the public behaviour correct: visible text now excludes head content, which matches what a browser renders.
+- **`datetime.UTC` is Python 3.11+** but our CI matrix includes 3.10. The original spec used `datetime.now(UTC).isoformat()`, which would raise `ImportError: cannot import name 'UTC' from 'datetime'` on the 3.10 runner. Switched to `datetime.now(timezone.utc).isoformat()`, which is semantically identical (`UTC` is just an alias for `timezone.utc` in 3.11) but works across the full matrix.
