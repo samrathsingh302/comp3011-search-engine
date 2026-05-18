@@ -113,3 +113,48 @@ A running log of design choices made during the build. Each entry captures the d
 - **The `## Reference location (read-only)` section pointed at `C:\Users\samra\comp3011-reference\`** and named it the source of "shape verification". Even with the "DO NOT copy" caveat, a marker reading the repo could reasonably ask why such a path is documented; it is cleaner to keep that affordance private and undocumented in the repo.
 - **Existing exposure is irreducible.** Commits `4cdf57e` and `8dd16ab` already contain the older content. The gitignore step does not rewrite history; it stops further commits from adding to that exposure.
 - **Local file remains.** Future sessions still read `CLAUDE.md` from the working tree at the start of every session; the working agreement of pre-flight pytest, atomic sessions, conventional commits, and decisions-log discipline is unaffected.
+
+## 2026-05-18 — Tokeniser regex preserves word-internal punctuation
+
+**Decision**: `TOKEN_PATTERN = re.compile(r"[a-z0-9]+(?:['\-][a-z0-9]+)*", flags=re.UNICODE)` is the single source of truth for what counts as a token. The character class is explicit ASCII; Unicode quote and dash variants are normalised away by `_normalise_unicode_punctuation` before the regex runs.
+
+**Alternatives considered**:
+- `r"\w+"` (simplest, but drops apostrophes and hyphens entirely, killing recall on "don't", "t-shirt");
+- `r"[a-z0-9'\-]+"` (keeps the characters but allows leading and trailing punctuation, so "—word" becomes "-word");
+- a tokeniser library such as `spacy` or `nltk.word_tokenize` (heavyweight, requires data downloads, more than Lecture 11 needs).
+
+**Rationale**:
+- **Word-internal apostrophes** preserve possessives ("master's") and contractions ("don't"). Lecture 11 explicitly flags these as the canonical regex-design lesson.
+- **Word-internal hyphens** preserve compounds ("t-shirt", "e-bay", "state-of-the-art"). The non-capturing group `(?:['\-][a-z0-9]+)*` allows zero-or-more connector segments, so "state-of-the-art" matches as a single token rather than three.
+- **Leading and trailing punctuation cannot match** because the pattern starts and ends with `[a-z0-9]+`. So "—word" tokenises to ["word"], not ["-word"].
+- **Unicode normalisation runs before tokenisation**, not after. U+2019 ("’"), U+2018 ("‘"), U+02BC ("ʼ") become ASCII apostrophe; U+2013 ("–"), U+2014 ("—"), U+2212 ("−") become ASCII hyphen. Doing this before `.lower()` and before the regex keeps the regex itself simple ASCII.
+
+## 2026-05-18 — mypy: pragmatic strictness
+
+**Decision**: Add `mypy>=1.8.0,<2.0` to dev requirements. Configure `mypy.ini` with `python_version = 3.10`, `warn_return_any = True`, `ignore_missing_imports = True`, `disallow_incomplete_defs = True`, `no_implicit_optional = True`. CI runs `mypy src/` after ruff.
+
+**Alternatives considered**:
+- `--strict` (turns on every mypy rule, drowns the project in `Any` warnings from bs4 and nltk, demands stubs we will not write);
+- no mypy at all (cheaper, but the 80-100 marking band rewards type discipline and the first run already caught a real bug);
+- `pyright` instead (heavier install, less mature on Windows venvs).
+
+**Rationale**:
+- **`ignore_missing_imports = True`** because `nltk` and `beautifulsoup4` ship no type stubs and we are not going to write or vendor any. `bs4` does provide partial inline annotations now, which surfaced one real bug already; that is the right level of strictness.
+- **`disallow_incomplete_defs`** catches the failure mode where someone annotates the return type but forgets the parameters, which is worse than no annotations because it makes mypy confidently wrong.
+- **`no_implicit_optional`** forces `param: X | None = None` rather than `param: X = None`. This rule cost one minute today (crawler signatures already conformed) and pays off when reading code: a `None` default with `X | None` is loud, a `None` default with bare `X` is silent.
+- **`warn_return_any`** catches accidental returns of mypy-Any values, which is most useful at the boundary with `nltk` and `bs4` Any-typed code.
+
+**AI note**: First mypy run flagged `src/crawler.py:185-186` because bs4 types `anchor["href"]` as `str | Sequence[str]` (some HTML attributes are multi-valued) and my Session-1.5 `_extract_links` passed that union straight into `urljoin`, which is generic over `AnyStr`. Fixed by narrowing with `isinstance(href, str)` and skipping the (HTML-invalid) non-string case. This is the textbook case for `disallow_incomplete_defs` plus `warn_return_any`: a real type bug that the test suite would never have caught because all tests exercise valid HTML.
+
+## 2026-05-18 — Body excerpt cache (BODY_EXCERPT_CHARS=2000)
+
+**Decision**: Reserve a module-level constant `BODY_EXCERPT_CHARS = 2000` and a per-document text cache that Session 3.2's snippet generator will use.
+
+**Alternatives considered**:
+- Cache the full document text (wastes memory on long pages; quotes.toscrape.com has small pages but the design should not assume that);
+- Re-extract visible text on every search (slow; `extract_visible_text` is O(N) over HTML and called once per result);
+- Store only the matched-token positions (faster but cannot build a snippet that shows the surrounding sentence).
+
+**Rationale**:
+- 2000 characters is large enough to comfortably hold three or four sentences of context around any matched term, and small enough that 100 pages worth of cache fits in well under a megabyte. The snippet renderer in Session 3.2 will slice from this cache rather than re-parsing the HTML, which keeps `search.find()` fast even for 10-result responses.
+- Declaring the constant now means the indexer can populate the cache when documents are added, with no second pass over the corpus.

@@ -182,7 +182,13 @@ class Crawler:
         soup = BeautifulSoup(html, "html.parser")
         links: list[str] = []
         for anchor in soup.find_all("a", href=True):
-            absolute = urljoin(base_url, anchor["href"])
+            href = anchor["href"]
+            # bs4 types href as `str | Sequence[str]` because some attributes
+            # (class, rel) are multi-valued; for <a href> a single string is
+            # the only valid HTML, so narrow defensively and skip oddities.
+            if not isinstance(href, str):
+                continue
+            absolute = urljoin(base_url, href)
             normalised = self.normalise_url(absolute)
             if self._is_in_scope(normalised):
                 links.append(normalised)

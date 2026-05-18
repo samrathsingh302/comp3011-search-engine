@@ -40,3 +40,7 @@ jobs:
       - name: Lint with ruff
         run: ruff check src/ tests/
         continue-on-error: false
+
+      - name: Type check with mypy
+        run: mypy src/
+        continue-on-error: false
