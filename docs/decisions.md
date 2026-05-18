@@ -69,3 +69,19 @@ A running log of design choices made during the build. Each entry captures the d
 **Fixtures captured once via the live network.** `scripts/capture_fixtures.py` ran in the user's terminal with real `requests.Session` and a real 6 second sleep between fetches. The resulting `tests/fixtures/page{1,2,3}.html` files are committed so every subsequent test run uses identical HTML and never touches the live site again. This is the standard "record once, replay forever" pattern for crawler tests.
 
 **AI note**: First-draft `_load_robots()` used `parser.set_url()` plus `parser.read()` (which performs its own HTTP call via urllib, bypassing the injected `requests.Session`). That broke the injection design and would have made the robots-related tests hit the network. Corrected by calling `parser.parse(response.text.splitlines())` instead, so all HTTP routes through `self.session` and stays mockable.
+
+## 2026-05-18 — Linting and forward-compatible annotations
+
+**Decision**: Add `ruff` (>= 0.4.0) to dev requirements and configure it in `pyproject.toml` with the rule set `[E, F, W, I, B, UP]`, line length 100, ignoring `E501`, and `B011` ignored for tests. The CI workflow runs `ruff check src/ tests/` after pytest. Every `src/` module starts with `from __future__ import annotations` (after the docstring).
+
+**Alternatives considered**:
+- `flake8` plus `isort` plus `pyupgrade` as separate tools (slow, three configs to maintain, no shared cache);
+- `black` for formatting in addition to `ruff` (formatting drift is not a problem on a one-person, four-day project);
+- `mypy` for static typing (valuable for the 80-100 band but it is a bigger investment than this bootstrap step warrants; revisit before submission).
+
+**Rationale**:
+- **Ruff covers PEP 8 (E, W), pyflakes-style bug finding (F), import ordering (I), bug-bear patterns (B), and pyupgrade modernisation (UP) in a single binary**, in roughly 200 ms on a project this size. The B and UP rule sets are the actual win: B caught `assert x or y` style traps in the past, UP catches deprecated typing patterns. The first run flagged `from typing import Callable` (UP035) and pushed it to `from collections.abc import Callable`, which is the Python 3.9+ idiom.
+- **`from __future__ import annotations`** turns every annotation into a string at parse time (PEP 563). On Python 3.10 we get PEP 604 union syntax (`X | None`) and string-typed forward references for free, with zero runtime cost: the annotations are not evaluated unless something explicitly asks for them.  The `E501` ignore exists because line length is enforced by reading discipline, not by the linter shouting on every long-but-clear assertion.
+- **CI step ordering**: pytest first, ruff second. If tests fail the build is already red and the lint output is noise; if tests pass we still demand a clean lint to merge.
+
+**AI note**: Ruff's first complaint included `I001` in `tests/conftest.py` for an extra blank line between `import pytest` and the first module-level constant. Pre-ruff me had used the PEP 8 "two blank lines after imports" pattern; ruff's isort sub-tool prefers exactly one blank line in this context. Applied `ruff --fix` to take the suggestion rather than fight it; the resulting file is still PEP 8 valid because PEP 8 says "two or more" (allowing one in narrow cases).

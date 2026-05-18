@@ -33,9 +33,10 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 1.6
+Last session completed: 1.6 + linter bootstrap
 Test count: 26 (24 crawler, 2 smoke)
-Coverage: 97% on src/crawler.py (117/121 statements); four uncovered lines are defensive branches (scope re-check on dequeue, skip-on-fetch-failure during BFS, robots.txt non-200 log path, robots.txt parser-None early return inside _is_allowed when called from a never-loaded crawler). Total project coverage 96.69%.
+Coverage: 97% on src/crawler.py (117/121 statements); four uncovered lines are defensive branches (scope re-check on dequeue, skip-on-fetch-failure during BFS, robots.txt non-200 log path, robots.txt parser-None early return inside _is_allowed when called from a never-loaded crawler). Total project coverage 96.72%.
+Linter: ruff clean (rules E, F, W, I, B, UP; line-length 100; CI runs `ruff check src/ tests/` after pytest)
 HTML fixtures captured: tests/fixtures/page1.html (11021 B), page2.html (13699 B), page3.html (9987 B).
 Next session: 2.1 (tokeniser)
 
