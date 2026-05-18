@@ -85,3 +85,31 @@ A running log of design choices made during the build. Each entry captures the d
 - **CI step ordering**: pytest first, ruff second. If tests fail the build is already red and the lint output is noise; if tests pass we still demand a clean lint to merge.
 
 **AI note**: Ruff's first complaint included `I001` in `tests/conftest.py` for an extra blank line between `import pytest` and the first module-level constant. Pre-ruff me had used the PEP 8 "two blank lines after imports" pattern; ruff's isort sub-tool prefers exactly one blank line in this context. Applied `ruff --fix` to take the suggestion rather than fight it; the resulting file is still PEP 8 valid because PEP 8 says "two or more" (allowing one in narrow cases).
+
+## 2026-05-18 — Linting, pinned dependencies, future-annotations baseline
+
+**Decision**: Tighten the ruff pin to `>=0.4.0,<0.5` and add `mypy>=1.8.0,<2.0` to `requirements-dev.txt` (mypy itself is configured in Session 2.1). Pin runtime dependencies to exact versions: `requests==2.34.2`, `beautifulsoup4==4.14.3`, `nltk==3.9.4`. Every `src/` module now starts with a docstring followed by `from __future__ import annotations`, in that order.
+
+**Alternatives considered**:
+- Open-ended pins on runtime deps (simpler, but the marker's machine might resolve different versions and surface a bug we never saw locally);
+- Pinning every transitive dep with `pip freeze > requirements.txt` (over-pinning hides legitimate security updates and is harder to read);
+- Leaving ruff on its latest minor (newer ruff sometimes flips rules; pinning to a known-stable range is the cheapest way to make CI reproducible).
+
+**Rationale**:
+- **Exact pins on direct runtime deps** make CI on Python 3.10/3.11/3.12 a single source of truth: when the marker installs from `requirements.txt`, they get the same `requests`, `beautifulsoup4`, and `nltk` we developed against. Transitive deps are left to pip's resolver because over-pinning them would force lockstep upgrades and obscure the actually-relevant constraints.
+- **Range pins on dev tools** (`ruff>=0.4.0,<0.5`, `mypy>=1.8.0,<2.0`) lock the major version where rule sets are stable, while leaving room for patch fixes.
+- **Future-annotations after the docstring** is load-bearing. If `from __future__ import annotations` precedes the module string literal, Python parses the string as a regular expression and `module.__doc__` becomes `None`. Putting the future import second preserves `__doc__` for help() and for the GenAI declaration we will emit in `GENAI_EVALUATION.md`.
+
+## 2026-05-18 — CLAUDE.md treated as project-private notes
+
+**Decision**: Stop tracking `CLAUDE.md` in version control. The file is added to `.gitignore` and removed from the index via `git rm --cached`. The local copy stays on disk and continues to drive future-me's behaviour at session start; only its public visibility changes.
+
+**Alternatives considered**:
+- Leave it tracked but redact sensitive sections (incomplete: history retains everything, including the existing reference to the working oracle path);
+- Move the content into `docs/` under a different name (no benefit; same exposure surface);
+- Delete the file entirely (loses the session-start memory that has been useful).
+
+**Rationale**:
+- **The `## Reference location (read-only)` section pointed at `C:\Users\samra\comp3011-reference\`** and named it the source of "shape verification". Even with the "DO NOT copy" caveat, a marker reading the repo could reasonably ask why such a path is documented; it is cleaner to keep that affordance private and undocumented in the repo.
+- **Existing exposure is irreducible.** Commits `4cdf57e` and `8dd16ab` already contain the older content. The gitignore step does not rewrite history; it stops further commits from adding to that exposure.
+- **Local file remains.** Future sessions still read `CLAUDE.md` from the working tree at the start of every session; the working agreement of pre-flight pytest, atomic sessions, conventional commits, and decisions-log discipline is unaffected.

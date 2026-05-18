@@ -38,3 +38,6 @@ desktop.ini
 nltk_data/
 
 # Note: data/index.json IS tracked. It is the deliverable from the live crawl.
+
+# Project-private scratch memory (not for the repo)
+CLAUDE.md
