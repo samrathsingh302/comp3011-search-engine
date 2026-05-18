@@ -41,3 +41,16 @@ A running log of design choices made during the build. Each entry captures the d
 **Rationale**: The distinction between "server answered, the answer is no" (non-200) and "couldn't even reach the server" (RequestException) is the right axis. We retry the second category once because the connection might genuinely be flaky. We refuse to retry the first because the server has expressed an opinion. The 1-second backoff is well under the 6-second politeness window, so retries do not blow the politeness budget when crawling. Lecture 9 explicitly calls out graceful failure handling as a crawler quality bar.
 
 **AI note**: First-draft of `_fetch` looped over `(1, 2)` with `continue` and a trailing `return None`. The trailing return was unreachable, which both coverage and any half-decent linter flag. Restructured to a linear "try, except->sleep->retry, fall through to status check" so the dead code goes away. Cleaner and easier to read aloud during the video walkthrough.
+
+## 2026-05-18 — BFS over DFS
+
+**Decision**: `Crawler.crawl()` traverses with BFS using `collections.deque` as the queue and a local `visited: set[str]` scoped to the call.
+
+**Alternatives considered**: DFS via recursion (simpler to write, but blows up on deep link chains, and on `quotes.toscrape.com` would dive into one author's quote pages before discovering the second pagination page); DFS via an explicit stack (same shape as BFS but worse traversal order for this site); a priority queue that prefers pagination links (premature optimisation when BFS already wins).
+
+**Rationale**:
+- **Discovery order.** BFS visits the seed, then every page reachable in one hop, then every page reachable in two hops, and so on. On `quotes.toscrape.com` that means we walk the pagination chain (`/`, `/page/2/`, `/page/3/`, ...) before drilling into author or tag pages. A `max_pages=N` cap therefore returns the most representative slice of the site, not whichever sub-tree we happened to descend first.
+- **Visited set keyed on the normalised URL.** Using the output of `normalise_url` as the dedup key means `https://x.com/p`, `https://X.COM/p`, and `https://x.com/p#frag` all map to one fetch. Without normalisation we would crawl the same content three times and waste two units of the politeness budget.
+- **Politeness applies BETWEEN requests only.** Sleeping before the first request would pointlessly delay every CLI `build` by 6 seconds for nothing. The flag `is_first_request` flips after the first iteration so all subsequent fetches pay the politeness toll.
+
+**AI note**: Initial sketch put `visited` as an instance attribute (`self.visited`) so a second `crawl()` call on the same Crawler would carry old state. Decided that surprised the user (each `crawl()` should be a fresh traversal), so moved `visited` into the function body. The reference implementation keeps it on the instance; this is one deliberate divergence and is worth mentioning in the video.

@@ -33,13 +33,14 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 1.4
-Test count: 18 (16 crawler, 2 smoke)
-Coverage: 100% on src/crawler.py (51/51 statements); total project coverage 100% (only src/crawler.py and src/__init__.py exist so far)
-Next session: 1.5 (BFS with politeness)
+Last session completed: 1.5
+Test count: 23 (21 crawler, 2 smoke)
+Coverage: 98% on src/crawler.py (86/88 statements); two uncovered lines are defensive branches (re-check of scope on dequeue, skip-on-fetch-failure during BFS). Total project coverage 97.73%.
+Next session: 1.6 (robots.txt + fixtures)
 
 ## Session log
 1.1 scaffold + commit helper
 1.2 CI/CD pipeline
 1.3 crawler skeleton + URL normalisation
 1.4 fetch with single retry
+1.5 BFS with politeness

@@ -15,11 +15,13 @@ Lecture references:
 from __future__ import annotations
 
 import time
+from collections import deque
 from dataclasses import dataclass
 from typing import Callable
-from urllib.parse import urldefrag, urlparse
+from urllib.parse import urldefrag, urljoin, urlparse
 
 import requests
+from bs4 import BeautifulSoup
 
 
 @dataclass
@@ -125,3 +127,68 @@ class Crawler:
                 url=url, html=response.text, status_code=response.status_code
             )
         return None
+
+    def _extract_links(self, base_url: str, html: str) -> list[str]:
+        """Return every in-scope anchor href on the page as a normalised URL.
+
+        Relative hrefs are resolved against `base_url` via `urljoin` before
+        being normalised, so `<a href="/page/2/">` works whether the page
+        was fetched from the site root or a deeper path.
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        links: list[str] = []
+        for anchor in soup.find_all("a", href=True):
+            absolute = urljoin(base_url, anchor["href"])
+            normalised = self.normalise_url(absolute)
+            if self._is_in_scope(normalised):
+                links.append(normalised)
+        return links
+
+    def crawl(self) -> dict[str, str]:
+        """BFS crawl from `self.config.base_url`.
+
+        Returns a `{url: html}` dict. Behaviour:
+        - **BFS over DFS** so that the index page and pagination links are
+          discovered before quote-detail pages (Lecture 9: completeness on
+          shallow link structures matters more than depth-first quirks).
+        - The politeness window (`config.delay_seconds`) is applied
+          BETWEEN successive requests; the very first request happens
+          immediately, since there is no prior call to be polite to.
+        - The `visited` set is keyed on the normalised URL so trailing
+          slashes and fragment-only variants do not double-fetch.
+        - `config.max_pages` caps the total successful fetches; failures
+          (non-200 or post-retry network errors) are not counted against
+          the cap because they did not produce a page.
+        - robots.txt handling and `_load_robots` arrive in Session 1.6;
+          for now every in-scope URL is treated as allowed.
+        """
+        start = self.normalise_url(self.config.base_url)
+        queue: deque[str] = deque([start])
+        visited: set[str] = set()
+        pages: dict[str, str] = {}
+        is_first_request = True
+
+        while queue:
+            url = queue.popleft()
+            if url in visited:
+                continue
+            if not self._is_in_scope(url):
+                continue
+            if self.config.max_pages is not None and len(pages) >= self.config.max_pages:
+                break
+
+            if not is_first_request:
+                self.sleeper(self.config.delay_seconds)
+            is_first_request = False
+
+            visited.add(url)
+            result = self._fetch(url)
+            if result is None:
+                continue
+            pages[url] = result.html
+
+            for link in self._extract_links(url, result.html):
+                if link not in visited:
+                    queue.append(link)
+
+        return pages

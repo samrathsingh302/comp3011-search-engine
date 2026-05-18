@@ -24,6 +24,23 @@ def _make_response(text: str = "", status: int = 200) -> MagicMock:
     return response
 
 
+def _session_serving(pages: dict[str, str]) -> MagicMock:
+    """Build a fake `requests.Session` whose `.get()` returns canned HTML by URL.
+
+    Unknown URLs respond with a 404 so that out-of-fixture requests are
+    visible in test failures rather than silently returning empty 200s.
+    """
+    session = _make_session()
+
+    def fake_get(url: str, *args: object, **kwargs: object) -> MagicMock:
+        if url in pages:
+            return _make_response(text=pages[url], status=200)
+        return _make_response(status=404)
+
+    session.get.side_effect = fake_get
+    return session
+
+
 class TestNormaliseUrl:
     def test_strips_fragment(self) -> None:
         assert (
@@ -149,3 +166,68 @@ class TestFetch:
         crawler._fetch("https://quotes.toscrape.com/")
         _, kwargs = session.get.call_args
         assert kwargs.get("timeout") == 2.5
+
+
+class TestBfsCrawl:
+    def test_crawler_does_not_sleep_before_first_request(self) -> None:
+        """No prior request exists; the politeness window cannot apply."""
+        session = _session_serving({"https://quotes.toscrape.com/": ""})
+        sleeper = MagicMock()
+        crawler = Crawler(session=session, sleeper=sleeper)
+        crawler.crawl()
+        sleeper.assert_not_called()
+
+    def test_crawler_sleeps_between_requests(self) -> None:
+        session = _session_serving({
+            "https://quotes.toscrape.com/": '<a href="/page/2/">2</a>',
+            "https://quotes.toscrape.com/page/2/": "",
+        })
+        sleeper = MagicMock()
+        crawler = Crawler(
+            config=CrawlerConfig(delay_seconds=6.0),
+            session=session,
+            sleeper=sleeper,
+        )
+        crawler.crawl()
+        delays = [call.args[0] for call in sleeper.call_args_list]
+        assert 6.0 in delays
+
+    def test_crawler_stays_in_domain(self) -> None:
+        """An anchor pointing at a different netloc must be ignored."""
+        session = _session_serving({
+            "https://quotes.toscrape.com/": '<a href="https://external.example.com/">x</a>',
+        })
+        crawler = Crawler(session=session, sleeper=MagicMock())
+        result = crawler.crawl()
+        assert list(result.keys()) == ["https://quotes.toscrape.com/"]
+
+    def test_crawler_avoids_duplicate_urls(self) -> None:
+        """Three anchors to the same href should produce exactly one fetch."""
+        session = _session_serving({
+            "https://quotes.toscrape.com/": (
+                '<a href="/page/2/">a</a> '
+                '<a href="/page/2/">b</a> '
+                '<a href="/page/2/">c</a>'
+            ),
+            "https://quotes.toscrape.com/page/2/": "",
+        })
+        crawler = Crawler(session=session, sleeper=MagicMock())
+        result = crawler.crawl()
+        assert len(result) == 2
+        get_urls = [call.args[0] for call in session.get.call_args_list]
+        assert get_urls.count("https://quotes.toscrape.com/page/2/") == 1
+
+    def test_crawler_respects_max_pages(self) -> None:
+        """With a cap of 2, only 2 pages are returned even when 3 are reachable."""
+        session = _session_serving({
+            "https://quotes.toscrape.com/": '<a href="/page/2/">2</a>',
+            "https://quotes.toscrape.com/page/2/": '<a href="/page/3/">3</a>',
+            "https://quotes.toscrape.com/page/3/": "",
+        })
+        crawler = Crawler(
+            config=CrawlerConfig(max_pages=2),
+            session=session,
+            sleeper=MagicMock(),
+        )
+        result = crawler.crawl()
+        assert len(result) == 2
