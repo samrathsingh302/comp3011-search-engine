@@ -1,0 +1,40 @@
+# Python bytecode and build artefacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test and coverage artefacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+.hypothesis/
+
+# Editors and OS junk
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# NLTK downloads (regenerated on demand)
+nltk_data/
+
+# Note: data/index.json IS tracked. It is the deliverable from the live crawl.
