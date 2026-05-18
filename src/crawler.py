@@ -96,3 +96,32 @@ class Crawler:
         come in mixed case via redirects or anchor hrefs.
         """
         return urlparse(url).netloc.lower() == self._domain
+
+    def _fetch(self, url: str) -> CrawlResult | None:
+        """Fetch one page. Retry once with a 1 s backoff on transient errors.
+
+        Behaviour:
+        - HTTP 200 returns a `CrawlResult` carrying the body and status.
+        - Any non-200 status returns `None` immediately (NOT retried).
+          A non-200 means the server answered; the answer is "no".
+        - `requests.RequestException` (ConnectionError, Timeout, etc.)
+          triggers exactly one retry after a 1 s backoff via the injected
+          sleeper. If the retry also raises, returns `None`.
+
+        Retrying only on network-level errors mirrors the Lecture 9 advice
+        on transient vs permanent failures and keeps the crawler from
+        hammering a server that has already replied with 4xx or 5xx.
+        """
+        try:
+            response = self.session.get(url, timeout=self.config.timeout_seconds)
+        except requests.RequestException:
+            self.sleeper(1.0)
+            try:
+                response = self.session.get(url, timeout=self.config.timeout_seconds)
+            except requests.RequestException:
+                return None
+        if response.status_code == 200:
+            return CrawlResult(
+                url=url, html=response.text, status_code=response.status_code
+            )
+        return None

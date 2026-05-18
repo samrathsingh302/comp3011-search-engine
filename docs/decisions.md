@@ -31,3 +31,13 @@ A running log of design choices made during the build. Each entry captures the d
 **Rationale**: The coursework is graded on a marker's machine whose Python version we don't control. A three-version matrix proves the code runs unchanged on the entire currently-supported CPython range (3.13 came out as the latest stable; 3.10 is the oldest minor still in security maintenance at time of writing). `fail-fast: false` means all three jobs report even if one fails, which is what we want when diagnosing version-specific issues. The 85% floor is a baseline the build must always clear; the project target is 90% or higher and is asserted by individual test sessions, not by CI. Pip caching keyed on both requirements files keeps CI runs under a minute once warm.
 
 **AI note**: First-draft workflow had `fail-fast` left at its default of `true`. Switched it off because hiding two of three matrix jobs on a single failure removes most of the diagnostic value of a matrix in the first place.
+
+## 2026-05-18 — Fetch retry policy: once, on network-level errors only
+
+**Decision**: `Crawler._fetch` retries exactly once with a 1-second backoff, and only on `requests.RequestException`. Non-200 HTTP statuses return `None` immediately with no retry.
+
+**Alternatives considered**: retry on any failure including 4xx and 5xx (more aggressive, risks hammering a server that has already declined); exponential backoff with three retries (better for production crawlers, but a 6-second politeness floor already dominates the latency budget here, and three retries against a slow site can take a minute per page); no retry at all (drops legitimate transient failures, hurts crawl completeness).
+
+**Rationale**: The distinction between "server answered, the answer is no" (non-200) and "couldn't even reach the server" (RequestException) is the right axis. We retry the second category once because the connection might genuinely be flaky. We refuse to retry the first because the server has expressed an opinion. The 1-second backoff is well under the 6-second politeness window, so retries do not blow the politeness budget when crawling. Lecture 9 explicitly calls out graceful failure handling as a crawler quality bar.
+
+**AI note**: First-draft of `_fetch` looped over `(1, 2)` with `continue` and a trailing `return None`. The trailing return was unreachable, which both coverage and any half-decent linter flag. Restructured to a linear "try, except->sleep->retry, fall through to status check" so the dead code goes away. Cleaner and easier to read aloud during the video walkthrough.

@@ -34,8 +34,8 @@ Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
 Last session completed: 1.4
-Test count: 9
-Coverage: not yet measured (only crawler tests so far)
+Test count: 18 (16 crawler, 2 smoke)
+Coverage: 100% on src/crawler.py (51/51 statements); total project coverage 100% (only src/crawler.py and src/__init__.py exist so far)
 Next session: 1.5 (BFS with politeness)
 
 ## Session log
