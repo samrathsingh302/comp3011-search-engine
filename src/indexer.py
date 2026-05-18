@@ -245,3 +245,54 @@ class InvertedIndex:
     @property
     def term_count(self) -> int:
         return len(self.index)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise the index into a JSON-safe dict.
+
+        The returned shape is:
+            {
+                "metadata": {"version", "term_count", "document_count", "options"},
+                "documents": self.documents,
+                "index": self.index,
+            }
+        `version` is "1.0" so that future schema changes can be detected by
+        `from_dict` if we ever need to migrate older saved indices.
+        """
+        return {
+            "metadata": {
+                "version": "1.0",
+                "term_count": self.term_count,
+                "document_count": self.document_count,
+                "options": {
+                    "stem": self.options.stem,
+                    "remove_stopwords": self.options.remove_stopwords,
+                    "title_position_gap": self.options.title_position_gap,
+                },
+            },
+            "documents": self.documents,
+            "index": self.index,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> InvertedIndex:
+        """Rebuild an `InvertedIndex` from the dict returned by `to_dict`.
+
+        Defensive against missing keys: a corrupted or partial dict yields an
+        empty index with default options rather than raising. Options are
+        restored from `data["metadata"]["options"]` when present so that a
+        loaded index honours the same stemmer and stopword choices the
+        builder used.
+        """
+        metadata = data.get("metadata", {})
+        options_dict = metadata.get("options", {})
+        options = IndexerOptions(
+            stem=options_dict.get("stem", False),
+            remove_stopwords=options_dict.get("remove_stopwords", False),
+            title_position_gap=options_dict.get(
+                "title_position_gap", TITLE_BODY_POSITION_GAP
+            ),
+        )
+        instance = cls(options=options)
+        instance.documents = data.get("documents", {})
+        instance.index = data.get("index", {})
+        return instance

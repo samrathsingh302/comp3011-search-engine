@@ -30,12 +30,12 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 2.2 (InvertedIndex with positions, field weighting, body excerpt)
-Test count: 53 (24 crawler, 27 indexer, 2 smoke)
-Coverage: 96% on src/crawler.py (119/124), 91% on src/indexer.py (91/100); total project coverage 93.78%. Uncovered branches are all defensive (porter stemmer ImportError fallback, stemmer cache-hit branch, scope re-check on dequeue, robots non-200 log, fetch-None skip).
-Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md gitignored.
+Last session completed: 2.3 (to_dict/from_dict + JSON storage with atomic writes)
+Test count: 66 (24 crawler, 30 indexer, 10 storage, 2 smoke)
+Coverage: 96% on src/crawler.py (119/124), 93% on src/indexer.py (103/111), 94% on src/storage.py (34/36); total project coverage 94.49%. Uncovered branches are all defensive (porter stemmer ImportError fallback, stemmer cache-hit branch, scope re-check on dequeue, robots non-200 log, fetch-None skip, tmp-cleanup OSError swallow).
+Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes (no longer gitignored).
 HTML fixtures captured: tests/fixtures/page1.html (11021 B), page2.html (13699 B), page3.html (9987 B).
-Next session: 2.3 (index serialisation + storage)
+Next session: 2.4 (kick off real crawl in background)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -46,3 +46,4 @@ Next session: 2.3 (index serialisation + storage)
 1.6 robots.txt + fixtures
 2.1 tokeniser with edge cases + mypy
 2.2 InvertedIndex with positions, field weighting, body excerpt
+2.3 to_dict/from_dict + JSON storage with atomic writes

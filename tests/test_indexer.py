@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.indexer import (
     BODY_EXCERPT_CHARS,
     DEFAULT_STOPWORDS,
+    IndexerOptions,
     InvertedIndex,
     extract_title,
     extract_visible_text,
@@ -187,3 +188,49 @@ class TestInvertedIndex:
         index.add_document("http://example.com/", html)
         excerpt = index.documents["http://example.com/"]["body_excerpt"]
         assert len(excerpt) <= BODY_EXCERPT_CHARS
+
+
+class TestSerialisation:
+    def test_index_round_trip_serialisation(self, index: InvertedIndex) -> None:
+        """`to_dict` then `from_dict` should preserve vocabulary and postings."""
+        index.add_document(
+            "http://example.com/",
+            "<html><head><title>Hello</title></head><body>hello world</body></html>",
+        )
+        index.add_document(
+            "http://other.example.com/",
+            "<html><body>world peace</body></html>",
+        )
+        serialised = index.to_dict()
+        restored = InvertedIndex.from_dict(serialised)
+        assert restored.vocabulary == index.vocabulary
+        assert restored.document_count == index.document_count
+        assert restored.term_count == index.term_count
+        assert restored.get_term("hello") == index.get_term("hello")
+        assert restored.get_term("world") == index.get_term("world")
+
+    def test_indexer_options_propagate_to_to_dict(self) -> None:
+        """`to_dict` exposes the active options and `from_dict` restores them."""
+        options = IndexerOptions(
+            stem=True, remove_stopwords=True, title_position_gap=500
+        )
+        idx = InvertedIndex(options=options)
+        serialised = idx.to_dict()
+        assert serialised["metadata"]["options"]["stem"] is True
+        assert serialised["metadata"]["options"]["remove_stopwords"] is True
+        assert serialised["metadata"]["options"]["title_position_gap"] == 500
+        restored = InvertedIndex.from_dict(serialised)
+        assert restored.options.stem is True
+        assert restored.options.remove_stopwords is True
+        assert restored.options.title_position_gap == 500
+
+    def test_round_trip_preserves_body_excerpt(self, index: InvertedIndex) -> None:
+        """The 2 KB body excerpt cache survives `to_dict` -> `from_dict`."""
+        index.add_document(
+            "http://example.com/",
+            "<html><body>some visible content for the snippet generator</body></html>",
+        )
+        restored = InvertedIndex.from_dict(index.to_dict())
+        excerpt = restored.documents["http://example.com/"]["body_excerpt"]
+        assert "visible" in excerpt
+        assert "snippet" in excerpt
