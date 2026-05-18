@@ -14,14 +14,18 @@ Lecture references:
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable
 from urllib.parse import urldefrag, urljoin, urlparse
+from urllib.robotparser import RobotFileParser
 
 import requests
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,6 +70,8 @@ class Crawler:
         self.sleeper = sleeper
         self.session.headers.update({"User-Agent": self.config.user_agent})
         self._domain: str = urlparse(self.config.base_url).netloc.lower()
+        self._robot_parser: RobotFileParser | None = None
+        self._effective_delay: float = self.config.delay_seconds
 
     @staticmethod
     def normalise_url(url: str) -> str:
@@ -128,6 +134,44 @@ class Crawler:
             )
         return None
 
+    def _load_robots(self) -> None:
+        """Fetch and parse `/robots.txt`. Failure is non-fatal.
+
+        Behaviour:
+        - When `config.respect_robots` is False, this is a no-op.
+        - A `requests.RequestException` (timeout, ConnectionError, etc.)
+          or any non-200 status is treated as "no robots policy": we
+          log a warning and leave `_robot_parser` as None, which makes
+          `_is_allowed` return True for every URL.
+        - When robots.txt declares `Crawl-delay: N` for our user agent
+          and N exceeds our configured floor, `_effective_delay` is
+          bumped to N. The brief's 6 second minimum stays in force as
+          a lower bound because we never decrease the delay here.
+        """
+        if not self.config.respect_robots:
+            return
+        robots_url = urljoin(self.config.base_url, "/robots.txt")
+        try:
+            response = self.session.get(robots_url, timeout=self.config.timeout_seconds)
+        except requests.RequestException as exc:
+            logger.warning("robots.txt unreachable at %s: %s", robots_url, exc)
+            return
+        if response.status_code != 200:
+            logger.info("No robots.txt at %s (status %s)", robots_url, response.status_code)
+            return
+        parser = RobotFileParser()
+        parser.parse(response.text.splitlines())
+        self._robot_parser = parser
+        site_delay = parser.crawl_delay(self.config.user_agent)
+        if site_delay is not None and float(site_delay) > self._effective_delay:
+            self._effective_delay = float(site_delay)
+
+    def _is_allowed(self, url: str) -> bool:
+        """Return True if no robots policy was loaded or the policy permits `url`."""
+        if self._robot_parser is None:
+            return True
+        return self._robot_parser.can_fetch(self.config.user_agent, url)
+
     def _extract_links(self, base_url: str, html: str) -> list[str]:
         """Return every in-scope anchor href on the page as a normalised URL.
 
@@ -159,9 +203,14 @@ class Crawler:
         - `config.max_pages` caps the total successful fetches; failures
           (non-200 or post-retry network errors) are not counted against
           the cap because they did not produce a page.
-        - robots.txt handling and `_load_robots` arrive in Session 1.6;
-          for now every in-scope URL is treated as allowed.
+        - robots.txt is loaded once before BFS starts; disallowed URLs are
+          marked visited and silently skipped so they cannot be re-queued.
+        - The inter-request sleep uses `_effective_delay`, which equals
+          `config.delay_seconds` unless robots.txt asks for longer.
         """
+        if self.config.respect_robots:
+            self._load_robots()
+
         start = self.normalise_url(self.config.base_url)
         queue: deque[str] = deque([start])
         visited: set[str] = set()
@@ -174,11 +223,15 @@ class Crawler:
                 continue
             if not self._is_in_scope(url):
                 continue
+            if not self._is_allowed(url):
+                logger.info("Skipping %s (disallowed by robots.txt)", url)
+                visited.add(url)
+                continue
             if self.config.max_pages is not None and len(pages) >= self.config.max_pages:
                 break
 
             if not is_first_request:
-                self.sleeper(self.config.delay_seconds)
+                self.sleeper(self._effective_delay)
             is_first_request = False
 
             visited.add(url)

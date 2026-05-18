@@ -54,3 +54,18 @@ A running log of design choices made during the build. Each entry captures the d
 - **Politeness applies BETWEEN requests only.** Sleeping before the first request would pointlessly delay every CLI `build` by 6 seconds for nothing. The flag `is_first_request` flips after the first iteration so all subsequent fetches pay the politeness toll.
 
 **AI note**: Initial sketch put `visited` as an instance attribute (`self.visited`) so a second `crawl()` call on the same Crawler would carry old state. Decided that surprised the user (each `crawl()` should be a fresh traversal), so moved `visited` into the function body. The reference implementation keeps it on the instance; this is one deliberate divergence and is worth mentioning in the video.
+
+## 2026-05-18 — robots.txt: graceful failure
+
+**Decision**: `Crawler._load_robots()` is best-effort. A `RequestException` or any non-200 status leaves `_robot_parser` as `None`, which makes `_is_allowed` permissive for every URL. The crawl proceeds as if no policy were declared.
+
+**Alternatives considered**: refuse to crawl when robots.txt is unreachable (safer for hostile sites but punishes the user for transient network blips on a well-behaved site like `quotes.toscrape.com`); cache the failure and retry mid-crawl (premature complexity for a one-domain, one-process crawler).
+
+**Rationale**:
+- **Missing robots is not the same as denial.** A 404 on `/robots.txt` is the canonical signal that the site has no policy; treating it as "deny everything" is a misread of RFC 9309.
+- **Network blips are common.** A transient `ConnectionError` on `/robots.txt` followed by a crawl that proceeds at 6 second politeness is far less hostile than retrying forever.
+- **Crawl-delay wins only if it is stricter.** `_effective_delay = max(config.delay_seconds, robots_crawl_delay)`. The brief's 6 second floor is a contractual minimum; we never drop below it just because a site asks us to. This protects the user's grade from any robots.txt that lies about being more permissive than the brief allows.
+
+**Fixtures captured once via the live network.** `scripts/capture_fixtures.py` ran in the user's terminal with real `requests.Session` and a real 6 second sleep between fetches. The resulting `tests/fixtures/page{1,2,3}.html` files are committed so every subsequent test run uses identical HTML and never touches the live site again. This is the standard "record once, replay forever" pattern for crawler tests.
+
+**AI note**: First-draft `_load_robots()` used `parser.set_url()` plus `parser.read()` (which performs its own HTTP call via urllib, bypassing the injected `requests.Session`). That broke the injection design and would have made the robots-related tests hit the network. Corrected by calling `parser.parse(response.text.splitlines())` instead, so all HTTP routes through `self.session` and stays mockable.

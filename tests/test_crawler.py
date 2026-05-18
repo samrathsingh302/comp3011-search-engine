@@ -231,3 +231,38 @@ class TestBfsCrawl:
         )
         result = crawler.crawl()
         assert len(result) == 2
+
+
+class TestRobots:
+    def test_crawler_robots_txt_blocks_path(self) -> None:
+        """A path disallowed by robots.txt is skipped, siblings are still crawled."""
+        session = _session_serving({
+            "https://quotes.toscrape.com/robots.txt": "User-agent: *\nDisallow: /blocked\n",
+            "https://quotes.toscrape.com/": (
+                '<a href="/blocked">x</a> <a href="/ok">y</a>'
+            ),
+            "https://quotes.toscrape.com/blocked": "should not appear",
+            "https://quotes.toscrape.com/ok": "fine",
+        })
+        crawler = Crawler(session=session, sleeper=MagicMock())
+        result = crawler.crawl()
+        assert "https://quotes.toscrape.com/blocked" not in result
+        assert "https://quotes.toscrape.com/ok" in result
+
+    def test_crawler_handles_missing_robots_txt(self) -> None:
+        """A network failure on /robots.txt must not abort the crawl."""
+        session = _make_session()
+
+        def fake_get(url: str, *args: object, **kwargs: object) -> MagicMock:
+            if url.endswith("/robots.txt"):
+                raise requests.ConnectionError("no robots")
+            return _make_response(text="<html><body>ok</body></html>", status=200)
+
+        session.get.side_effect = fake_get
+        crawler = Crawler(session=session, sleeper=MagicMock())
+        result = crawler.crawl()
+        assert "https://quotes.toscrape.com/" in result
+
+    def test_crawler_default_delay_is_six_seconds(self) -> None:
+        """Synonym for the brief-compliance test; ensures the prompt's name exists."""
+        assert CrawlerConfig().delay_seconds >= 6.0
