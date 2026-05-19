@@ -30,12 +30,13 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 4.3 (word-for-word video script + teleprompter)
+Last session completed: 4.4 (GitHub push verified; CI green on all three Python versions; v1.0-submission tag pushed)
 Test count: 127. Coverage 100% on all src/ modules. ruff + mypy clean.
-docs/video_script.md: 49 lines, 398 spoken words across `> ...` blocks. Estimated read-aloud time 2:51-3:19; with ~70s of demo action, total 4:10-4:30 (target was 4:30, ceiling 4:50).
-scripts/demo_runner.py: stdin-press-Enter teleprompter showing each demo command on a side monitor.
-GenAI section of video cites 2 events verbatim from GENAI_EVALUATION.md Section 3: emptyline -> None mypy catch, and PowerShell -c quote stripping.
-Next session: 4.4 (push to GitHub, verify CI)
+Repo: https://github.com/samrathsingh302/comp3011-search-engine (PUBLIC). Repo name differs from v7.1 spec's `comp3011-cw2`; the repo was created Day 1 under the more descriptive name and was kept rather than splitting history.
+CI: run 26102490346 on commit 74b098c (== v1.0-submission tag) succeeded on Python 3.10 (24s), 3.11 (21s), 3.12 (20s).
+Tags pushed: v0.2-crawler, v0.3-indexer-storage, v0.4-search, v0.5-cli, v0.9-tests-passing, v1.0-submission.
+Postamble edits (decisions.md "## CI green ..." entry + this CLAUDE.md update) are staged uncommitted because the 4.4 spec did not call for `commit_session`; the v1.0-submission tag stays on the pre-postamble commit as the canonical submission marker. Future sessions can fold these edits in.
+Next session: 4.5 (recording walkthrough)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -59,3 +60,4 @@ Next session: 4.4 (push to GitHub, verify CI)
 4.1 comprehensive README with architecture, benchmarks, and ranking comparison
 4.2 GenAI critical evaluation drawn from decisions log (14 verbatim AI-note events)
 4.3 word-for-word video script (4:30 target) + demo_runner teleprompter
+4.4 GitHub push, CI green on Python 3.10/3.11/3.12, v1.0-submission tag pushed

@@ -523,3 +523,19 @@ A running log of design choices made during the build. Each entry captures the d
 **Companion teleprompter**: `scripts/demo_runner.py` is a stdin-press-Enter helper that reveals each demo command one at a time on a side monitor. It does not drive the search shell directly — the presenter types each command manually into a separate `(search)` window so the recording feels organic rather than scripted. The teleprompter exists solely to remove "what command was next?" pauses from the live demo.
 
 **Trimming policy** if a take runs over 4:40: cut from the code walkthrough commentary first (keep each file open and one short label per file). Live demo commands are non-negotiable. The 0:30 GenAI section is also non-negotiable because it carries the 15% mark and must include at least one concrete AI-failure example with the tool-output quoted.
+
+## 2026-05-19 — CI green on Python 3.10/3.11/3.12 with ruff + mypy + pytest
+
+**Decision**: GitHub Actions verifies the build on every push to `main` and on every PR to `main`. The workflow at `.github/workflows/tests.yml` runs four steps per matrix entry: checkout, set up Python, install `requirements-dev.txt`, run pytest with the 85% coverage gate (locally the actual coverage is 100%), run ruff, run mypy. The matrix is Python 3.10 / 3.11 / 3.12 on `ubuntu-latest` with `fail-fast: false`.
+
+**Observed state** at submission tag `v1.0-submission` (commit `74b098c`), CI run [26102490346](https://github.com/samrathsingh302/comp3011-search-engine/actions/runs/26102490346):
+- pytest on Python 3.10 in 24 s — success
+- pytest on Python 3.11 in 21 s — success
+- pytest on Python 3.12 in 20 s — success
+- ruff and mypy clean on all three jobs
+
+**No CI repair was needed** for `v1.0-submission`. The Python-version compatibility traps that v7.1's bootstrap pre-emptively defended against (`datetime.UTC` vs `timezone.utc`, the future-annotations baseline) prevented the kinds of breakages that the spec's "common CI failure triage" section was prepared to handle. The recurring Node.js 20 deprecation warning on `actions/checkout@v4` and `actions/setup-python@v5` is informational, not a failure, and is scheduled for cleanup in a future `ci:` commit if needed before Node 20 is fully removed in September 2026.
+
+**Repo state**: `samrathsingh302/comp3011-search-engine` (public). Six semantic tags at submission: `v0.2-crawler`, `v0.3-indexer-storage`, `v0.4-search`, `v0.5-cli`, `v0.9-tests-passing`, `v1.0-submission`.
+
+**Note on repo name**: the original v7.1 spec assumed a fresh `gh repo create comp3011-cw2 --public ...` step at this point. The repo had already been created on Day 1 under the more descriptive name `comp3011-search-engine`, so the create step was skipped; everything downstream (push, tag, CI verification) happened on the existing public repo with no loss of history.
