@@ -45,7 +45,7 @@ class Shell(cmd.Cmd):
     )
     prompt = "(search) "
 
-    def __init__(  # pragma: no cover
+    def __init__(
         self,
         index_path: str | Path | None = None,
         crawler_config: CrawlerConfig | None = None,
@@ -58,7 +58,7 @@ class Shell(cmd.Cmd):
         self.index: InvertedIndex | None = None
         self.engine: SearchEngine | None = None
 
-    def _require_index(self) -> bool:  # pragma: no cover
+    def _require_index(self) -> bool:
         """Print a friendly message and return False when no index is loaded."""
         if self.engine is None or self.index is None:
             print(
@@ -68,7 +68,7 @@ class Shell(cmd.Cmd):
             return False
         return True
 
-    def do_build(self, line: str) -> None:  # pragma: no cover
+    def do_build(self, line: str) -> None:
         """build: Crawl the configured site and build a fresh inverted index."""
         try:
             print(
@@ -87,10 +87,10 @@ class Shell(cmd.Cmd):
                 f"{self.index.document_count} pages."
             )
             print(f"Saved to {self.index_path}.")
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive surface
             print(f"Build failed: {exc}")
 
-    def do_load(self, line: str) -> None:  # pragma: no cover
+    def do_load(self, line: str) -> None:
         """load: Read a previously-saved inverted index from disk."""
         try:
             data = load_index(self.index_path)
@@ -105,7 +105,7 @@ class Shell(cmd.Cmd):
         except Exception as exc:
             print(f"Load failed: {exc}")
 
-    def do_print(self, line: str) -> None:  # pragma: no cover
+    def do_print(self, line: str) -> None:
         """print <word>: Show posting list info for a single term."""
         word = line.strip()
         if not word:
@@ -116,10 +116,10 @@ class Shell(cmd.Cmd):
         assert self.engine is not None
         try:
             print(self.engine.format_term_entry(word))
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive surface
             print(f"Print failed: {exc}")
 
-    def do_find(self, line: str) -> None:  # pragma: no cover
+    def do_find(self, line: str) -> None:
         """find [--ranking tfidf|bm25] <query>: AND-search for all query terms.
 
         The `--ranking` flag may appear anywhere in the argument list; the
@@ -160,10 +160,10 @@ class Shell(cmd.Cmd):
                 engine = self.engine
             results = engine.find(query)
             print(engine.format_find_results(query, results))
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive surface
             print(f"Search failed: {exc}")
 
-    def do_stats(self, line: str) -> None:  # pragma: no cover
+    def do_stats(self, line: str) -> None:
         """stats: Print page count, term count, total postings, top 10 terms."""
         if not self._require_index():
             return
@@ -191,10 +191,10 @@ class Shell(cmd.Cmd):
             print("Top 10 terms by total frequency:")
             for term, freq in term_frequencies[:10]:
                 print(f"  {term}: {freq}")
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive surface
             print(f"Stats failed: {exc}")
 
-    def do_benchmark(self, line: str) -> None:  # pragma: no cover
+    def do_benchmark(self, line: str) -> None:
         """benchmark: Time 7 sample queries and print millisecond elapsed for each."""
         if not self._require_index():
             return
@@ -208,24 +208,24 @@ class Shell(cmd.Cmd):
                 print(
                     f"  {query!r}: {len(results)} hits in {elapsed_ms:.2f} ms"
                 )
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive surface
             print(f"Benchmark failed: {exc}")
 
-    def do_exit(self, line: str) -> bool:  # pragma: no cover
+    def do_exit(self, line: str) -> bool:
         """exit: Leave the shell."""
         print("Goodbye.")
         return True
 
-    def do_quit(self, line: str) -> bool:  # pragma: no cover
+    def do_quit(self, line: str) -> bool:
         """quit: Alias for `exit`."""
         return self.do_exit(line)
 
-    def do_EOF(self, line: str) -> bool:  # pragma: no cover
+    def do_EOF(self, line: str) -> bool:
         """EOF: Treat Ctrl-D / end-of-input as exit."""
         print()
         return self.do_exit(line)
 
-    def default(self, line: str) -> None:  # pragma: no cover
+    def default(self, line: str) -> None:
         """Fallback for any unrecognised command."""
         first = line.split()[0] if line.split() else line
         print(
@@ -233,7 +233,7 @@ class Shell(cmd.Cmd):
             f"Type `help` for available commands."
         )
 
-    def emptyline(self) -> bool:  # pragma: no cover
+    def emptyline(self) -> bool:
         """Override cmd.Cmd's default (which would repeat the last command).
 
         Returns False so the cmdloop stays open on a blank line; cmd.Cmd's

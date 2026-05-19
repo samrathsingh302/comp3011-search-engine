@@ -381,3 +381,22 @@ A running log of design choices made during the build. Each entry captures the d
 - **No extra dependencies.** `cmd` and `time` are stdlib; the project's runtime `requirements.txt` is unchanged by adding the CLI.
 
 **AI note**: First-pass `emptyline()` was typed `-> None`. Mypy flagged `error: Return type "None" of "emptyline" incompatible with return type "bool" in supertype "cmd.Cmd" [override]` — the typeshed stub for `cmd.Cmd.emptyline` declares `-> bool` (returning truthy ends the loop). Changed to `-> bool` and `return False` so a blank input continues the loop deliberately rather than relying on Python's implicit-None-as-False coercion. Exactly the kind of override-mismatch a type checker is supposed to catch.
+
+## 2026-05-19 — CLI tests with mocked Crawler
+
+**Decision**: Every `do_*` method in `Shell` is covered by at least one test in `tests/test_cli.py`. The `src.cli.Crawler` symbol is monkeypatched at module level to a `FakeCrawler` that returns canned pages, so `do_build` never touches the network. Capture is via `io.StringIO` and `contextlib.redirect_stdout`, with a one-test exception (`do_help`) that overrides `shell.stdout` directly. The Session 3.3 `# pragma: no cover` markers are removed from every method that now has a test; pragmas remain only on the defensive `except Exception:` arms inside each command (provoking those branches requires patching internal pure-Python functions, which is more work than the marginal coverage gain warrants) and on `run()` (which calls the blocking `cmdloop`).
+
+**Alternatives considered**:
+- **Hit the live site** for `do_build` integration tests: would re-introduce the 6-second politeness window in CI, make tests flaky on network blips, and waste the marker's quota. The brief explicitly rewards mock-based testing.
+- **Replace `Crawler` with `unittest.mock.MagicMock`**: works but loses type discipline (mypy treats `MagicMock` as `Any`, weakening the test as a contract). A small typed `FakeCrawler` class is clearer and survives `--strict` if we ever turn it on.
+- **Use `pytest`'s `capsys` fixture**: equivalent to `redirect_stdout` for `print()` output, but the spec called out `io.StringIO + contextlib.redirect_stdout` explicitly and we honoured it. The two-helper split (`_capture` for `print`, direct `shell.stdout = buf` for `cmd.Cmd`-internal writes) was prompted by the help test that the redirect-only helper missed.
+- **Test exit-code semantics by running `cmdloop()`**: requires fake stdin and is annoyingly fragile across platforms. The do_exit/do_quit/do_EOF tests assert the return value (`True` ends the loop) instead, which is a cleaner contract.
+
+**Rationale**:
+- **18 tests covering 13 named cases plus 5 extras** (benchmark, exit, quit, EOF, emptyline, plus a corrupt-file load and a no-query-after-ranking find). The named-13 list maps directly onto the brief's command surface; the 5 extras close the gap to 97 percent coverage on `cli.py`.
+- **`FakeCrawler` is intentionally minimal** — just enough shape (config, crawl()) to satisfy `do_build`. Future tests that need richer crawler behaviour can subclass it; current tests do not.
+- **Mocking at `src.cli.Crawler`, not at `src.crawler.Crawler`**, because Python imports bind the name at the importer's module. The `from src.crawler import Crawler` line in `cli.py` captures the symbol locally, so patching the `src.crawler` definition would not affect the running `Shell`. The monkeypatch.setattr address must match the import location.
+
+**AI note**: Two tool-catches before the test suite went green.
+- **Ruff UP035**: `from typing import Callable` flagged in `tests/test_cli.py` — newer Python prefers `from collections.abc import Callable`. This is the same rule that fired on `src/crawler.py` back in Session 1.6 (logged then). Pattern matched the prior fix; resolved by moving the import.
+- **`cmd.Cmd.do_help` writes to `self.stdout`, not `sys.stdout`**: the help test initially used the same `_capture` helper as the other CLI tests (which redirects `sys.stdout` via `contextlib.redirect_stdout`). It returned an empty string because `self.stdout` was bound to the real `sys.stdout` at `Shell.__init__` time, before the redirect. Resolved by setting `shell.stdout = buf` directly for that one test. The lesson: `contextlib.redirect_stdout` only captures `print()`-style writes that resolve `sys.stdout` dynamically; objects that cache `sys.stdout` at construction need explicit re-binding.
