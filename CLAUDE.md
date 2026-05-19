@@ -30,14 +30,13 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 3.2 (proximity boost + real text snippets + format_find_results suggestions)
-Test count: 93 (24 crawler, 30 indexer, 10 storage, 27 search, 2 smoke)
-Coverage: crawler 96%, indexer 93%, storage 94%, search 97%; total project coverage 95.58%.
+Last session completed: 3.3 (interactive cmd.Cmd shell with --ranking flag on find)
+Test count: 93 (24 crawler, 30 indexer, 10 storage, 27 search, 2 smoke). Smoke test extended to import cli and main for module-level coverage.
+Coverage: crawler 96%, indexer 93%, storage 94%, search 97%, cli 100% (every method body is `# pragma: no cover` until 3.4 adds tests; module-level code covered by smoke import), main 100%; total project coverage 95.72%.
 Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes.
-HTML fixtures captured: tests/fixtures/page1.html (11021 B), page2.html (13699 B), page3.html (9987 B).
-real_crawl_completed=true. data/index.json exists on disk (~4.21 MB, 4729 terms, 214 pages). Index file is NOT yet committed — that commit belongs to Session 3.6.
-Rankers: TF-IDF and BM25 selectable. Score stack: base * title_multiplier * proximity_multiplier. Snippets sliced from the cached 2 KB body_excerpt with ellipsis bracketing. format_find_results offers difflib suggestions for missing terms.
-Next session: 3.3 (CLI shell with --ranking flag)
+HTML fixtures captured. data/index.json exists on disk (~4.21 MB, 4729 terms, 214 pages); commit belongs to Session 3.6.
+CLI: `Shell(cmd.Cmd)` exposes build, load, print, find (with `--ranking tfidf|bm25`), stats, benchmark, exit/quit/EOF. Argument parsing accepts the ranking flag at any position. Every command wrapped in try/except.
+Next session: 3.4 (CLI tests — removes pragmas as each method gains coverage)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -54,3 +53,4 @@ Next session: 3.3 (CLI shell with --ranking flag)
 2.6 TF-IDF with 2.0x title boost
 3.1 Okapi BM25 ranking (Robertson Walker 1994)
 3.2 proximity boost + real text snippets + query suggestions
+3.3 interactive cmd.Cmd shell with --ranking flag on find

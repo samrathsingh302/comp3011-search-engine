@@ -348,3 +348,36 @@ A running log of design choices made during the build. Each entry captures the d
 - **Proximity should bias the order, not invent new winners.** Capping at 1.5x means a TF-IDF score difference of 1.5x or more cannot be reversed by proximity alone. The base ranker still drives the macro order; proximity tiebreaks among similarly-scored documents in favour of those where the query terms cluster.
 - **`title × proximity` composes cleanly.** A title that contains every query term tightly clustered gets `2.0 * 1.5 = 3.0x` the base score; either signal alone is at most 2.0x. This is the desired property: a perfect on-topic title with tight phrasing is the strongest signal short of an exact phrase match.
 - **Single-term escape.** Bypassing the calculation for `len(terms) < 2` keeps the boost from quietly multiplying single-term queries by some constant; the test `test_proximity_returns_one_for_single_term_query` pins this.
+
+## 2026-05-19 — `--ranking` flag on `find`
+
+**Decision**: The `find` command accepts an optional `--ranking tfidf|bm25` flag anywhere in its argument list. The four brief-required commands (`build`, `load`, `print`, `find`) keep their plain-spec behaviour; `--ranking` is an extension on `find` only. When the flag is absent the engine's default ranker (constructed at `load`/`build` time) is used; when present and different from the default, the shell constructs a transient `SearchEngine(self.index, ranking=...)` just for that query.
+
+**Alternatives considered**:
+- **`set_ranking` command** that mutates the engine for all subsequent queries (stateful and surprising; closing the shell would lose the choice);
+- **Two separate commands `find_tfidf` and `find_bm25`** (clutters the CLI surface and tempts the user to learn three find verbs instead of one);
+- **Switch on environment variable** (un-discoverable; would not appear in `help`);
+- **Position-only flag at the start of the line** (`find tfidf cat dog`) — ambiguous, indistinguishable from a query that contains the word "tfidf".
+
+**Rationale**:
+- **Position-anywhere parsing.** `find cat dog --ranking bm25` and `find --ranking bm25 cat dog` both work. The arg parser walks tokens, splices out the flag-value pair, and joins the remainder as the query.
+- **Validation at parse time.** An invalid ranking name prints a friendly "Unknown ranking: 'bogus'. Expected one of ['bm25', 'tfidf']." and returns; the engine is never constructed with bad input. `SearchEngine.__init__` would raise `ValueError` for the same case, but a CLI-level message is cleaner than letting the exception bubble.
+- **No persistent state change.** The shell-level `self.engine` keeps whatever ranker it was loaded with. A `--ranking` query is a one-shot override. This avoids the "did I switch ranking three queries ago?" footgun.
+- **Both the four required commands and the extension fit one screen of `help`.** cmd.Cmd's auto-help inspects the `do_*` docstrings, so the flag documentation appears beside the `find` description without any extra code.
+
+## 2026-05-19 — `cmd.Cmd` over `argparse`
+
+**Decision**: The CLI is a `cmd.Cmd` subclass with an interactive prompt, not a one-shot `argparse` script.
+
+**Alternatives considered**:
+- **`argparse`** (idiomatic for one-shot scripts but mismatched: the brief asks for an interactive shell where the user issues many queries in one session);
+- **`click` or `typer`** (third-party deps for one-shot CLIs; same mismatch as argparse, plus they add dependencies that the brief does not require);
+- **Hand-rolled REPL with `input()`** (would re-invent `cmd.Cmd`'s `help`, history-style `lastcmd`, `precmd/postcmd` hooks, and identifier-based command dispatch).
+
+**Rationale**:
+- **The brief mandates an interactive shell** with `build`, `load`, `print`, `find` as commands the user types into a prompt. `cmd.Cmd` is the stdlib answer to exactly that shape.
+- **`help` comes for free.** `cmd.Cmd` walks `do_*` method docstrings and renders them; no documentation source-of-truth duplication.
+- **EOF support comes for free.** Ctrl-D / end-of-input invokes `do_EOF` automatically, which I aliased to `do_exit`. This is how PowerShell's smoke test (`"exit" | python -m src.main`) closes the loop after the BOM-prefixed input.
+- **No extra dependencies.** `cmd` and `time` are stdlib; the project's runtime `requirements.txt` is unchanged by adding the CLI.
+
+**AI note**: First-pass `emptyline()` was typed `-> None`. Mypy flagged `error: Return type "None" of "emptyline" incompatible with return type "bool" in supertype "cmd.Cmd" [override]` — the typeshed stub for `cmd.Cmd.emptyline` declares `-> bool` (returning truthy ends the loop). Changed to `-> bool` and `return False` so a blank input continues the loop deliberately rather than relying on Python's implicit-None-as-False coercion. Exactly the kind of override-mismatch a type checker is supposed to catch.
