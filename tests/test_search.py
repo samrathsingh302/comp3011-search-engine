@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from src.indexer import InvertedIndex
-from src.search import SearchEngine, SearchResult
+from src.search import SNIPPET_WINDOW, SearchEngine, SearchResult
 
 
 @pytest.fixture
@@ -208,3 +208,111 @@ class TestBm25:
             tfidf_scores[url] != pytest.approx(bm25_scores[url], rel=1e-6)
             for url in tfidf_scores
         )
+
+
+class TestProximity:
+    def test_proximity_boost_rewards_close_terms(self) -> None:
+        """At equal TF, the doc with adjacent query terms ranks above the spread-out one."""
+        idx = InvertedIndex()
+        idx.add_document(
+            "http://close/",
+            "<html><body>cat dog</body></html>",
+        )
+        spread = " ".join(["filler"] * 1000)
+        idx.add_document(
+            "http://far/",
+            f"<html><body>cat {spread} dog</body></html>",
+        )
+        engine = SearchEngine(idx)
+        results = engine.find("cat dog")
+        assert len(results) == 2
+        close_score = next(r.score for r in results if r.url == "http://close/")
+        far_score = next(r.score for r in results if r.url == "http://far/")
+        assert close_score > far_score
+
+    def test_proximity_returns_one_for_single_term_query(self, engine: SearchEngine) -> None:
+        """A single-term query has no proximity to speak of; multiplier must be exactly 1.0."""
+        posting_lists = {
+            "cat": {"http://example.com/": {"positions": [1000]}},
+        }
+        assert engine._proximity_boost("http://example.com/", ["cat"], posting_lists) == 1.0
+
+
+class TestSuggest:
+    def test_suggest_returns_similar_words(self, engine: SearchEngine) -> None:
+        """`caat` is one edit from indexed `cat`; suggest must surface it."""
+        suggestions = engine.suggest("caat")
+        assert "cat" in suggestions
+
+    def test_suggest_returns_empty_for_unknown_words(self, engine: SearchEngine) -> None:
+        """A token with no neighbours in the vocab must yield an empty list, not None."""
+        assert engine.suggest("xyzqwertyabc") == []
+
+
+class TestSnippet:
+    def test_snippet_contains_matched_term_in_context(self) -> None:
+        idx = InvertedIndex()
+        body = (
+            "Many animals live in zoos around the world. "
+            "The elephant is one of the largest land creatures alive today. "
+            "Some can live for over fifty years in the wild."
+        )
+        idx.add_document(
+            "http://example.com/",
+            f"<html><body>{body}</body></html>",
+        )
+        engine = SearchEngine(idx)
+        results = engine.find("elephant")
+        assert len(results) == 1
+        snippet = results[0].snippet
+        assert "elephant" in snippet.lower()
+        # Window of 160 chars + up to 6 chars of ellipsis padding
+        assert len(snippet) <= SNIPPET_WINDOW + 6
+
+    def test_snippet_truncates_with_ellipsis_when_window_is_mid_document(self) -> None:
+        idx = InvertedIndex()
+        prefix = "lorem ipsum " * 80   # roughly 960 chars before the match
+        suffix = "more text follows " * 40  # roughly 720 chars after the match
+        body = f"{prefix} elephant {suffix}"
+        idx.add_document(
+            "http://example.com/",
+            f"<html><body>{body}</body></html>",
+        )
+        engine = SearchEngine(idx)
+        results = engine.find("elephant")
+        snippet = results[0].snippet
+        assert snippet.startswith("...")
+        assert snippet.endswith("...")
+
+    def test_snippet_falls_back_to_title_when_excerpt_empty(self) -> None:
+        """A page with a title but no body should snippet-fall-back to the title."""
+        idx = InvertedIndex()
+        idx.add_document(
+            "http://title-only/",
+            "<html><head><title>Elephant Adventures</title></head><body></body></html>",
+        )
+        engine = SearchEngine(idx)
+        results = engine.find("elephant")
+        assert len(results) == 1
+        assert "Elephant" in results[0].snippet
+
+
+class TestFormatFindResults:
+    def test_format_find_results_offers_suggestions_for_typo(self, engine: SearchEngine) -> None:
+        """A typo with no postings should produce a `did you mean: ...` line."""
+        results = engine.find("caat")
+        formatted = engine.format_find_results("caat", results)
+        assert "caat" in formatted
+        assert "did you mean" in formatted.lower()
+        assert "cat" in formatted
+
+    def test_format_find_results_displays_hits(self, engine: SearchEngine) -> None:
+        results = engine.find("cat")
+        formatted = engine.format_find_results("cat", results)
+        assert "Found" in formatted
+        assert "Ranking: TFIDF" in formatted
+        assert "http://a.example.com/" in formatted
+
+    def test_format_find_results_empty_query_shows_usage(self, engine: SearchEngine) -> None:
+        formatted = engine.format_find_results("", [])
+        assert "empty query" in formatted.lower()

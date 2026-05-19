@@ -312,3 +312,39 @@ A running log of design choices made during the build. Each entry captures the d
 - **The dispatch surface is one method (`_score_document`).** Adding a third ranker (say, BM25+ or BM25F) later would be a small isolated change, not a refactor.
 
 **Test that demonstrates the property**: `test_bm25_length_normalises` builds two documents with identical `tf("cat") = 1`, where one is two characters of body and the other is 200 filler tokens. BM25 ranks the short one first, which TF-IDF does not (TF-IDF has no length term). This is the textbook discriminator between the two algorithms.
+
+## 2026-05-19 — Real text snippets from cached body excerpt
+
+**Decision**: `SearchEngine._make_snippet` slices a `SNIPPET_WINDOW = 160`-character window out of the per-document `body_excerpt` cached by `InvertedIndex.add_document` in Session 2.2. The window is centred on the earliest matched query term, with ellipsis prefix and suffix when the window does not start at the beginning or end of the excerpt. The body excerpt is consulted, not the raw HTML; internal whitespace is collapsed so the snippet renders on a single CLI line.
+
+**Alternatives considered**:
+- **Re-parse the HTML for every search hit** (clean but slow: `extract_visible_text` is O(N) over the HTML, called per result during `find()`, so a 10-result query parses 10 pages of HTML);
+- **Return the matched-term posting positions** as a debug string (`"matched 'cat' at positions [0, 1000, 1234]"`) — accurate but useless to the user, who wants the surrounding sentence;
+- **Index sentence boundaries** so the window snaps to natural sentence starts (richer but adds another indexing pass and a sentence-boundary detector dependency);
+- **Highlight the matched term inline** with `**bold**` markdown — the brief asks for a CLI tool, not a markdown renderer; left for a future iteration.
+
+**Rationale**:
+- **Cached at index time** (Session 2.2). The `body_excerpt` cache was specifically introduced so the snippet renderer never reads the raw HTML again. 214 pages * 2 KB excerpt = ~430 KB of cache, well inside an order of magnitude of negligible memory cost on a workstation.
+- **Earliest matched term wins** when the query has multiple terms. This is the cheapest heuristic that produces a coherent context window; a fancier scheme could pick the densest cluster, but on a 2 KB excerpt the earliest-match window almost always covers the cluster anyway.
+- **Two graceful fallbacks**: empty excerpt → truncated title; no match in excerpt → truncated title. Either case still gives the user something to read.
+- **Ellipsis bracketing** signals that the snippet is a fragment, not the whole page. `"..."` is added when `start > 0` (window does not begin at byte 0) and again when `end < len(excerpt)` (window does not reach the end of the cache).
+- **Whitespace collapse via `re.sub(r"\s+", " ", window)`** removes the runs of spaces and newlines that survive `extract_visible_text` so the snippet is a single readable line in the CLI.
+
+## 2026-05-19 — Proximity multiplier capped at 1.5x
+
+**Decision**: After base score and title boost, `_score_document` multiplies by `_proximity_boost(url, terms, posting_lists)`. The boost is computed from the document-wide span between the earliest first-occurrence of any query term and the latest last-occurrence of any query term, mapped through `1.0 + min(0.5, 50 / (span + 50))` for multi-term queries (and exactly `1.0` for single-term queries or for any term that has no positions on this document).
+
+**Properties of the formula**:
+- **Capped at 1.5x.** The `min(0.5, ...)` clamp guarantees the multiplier never exceeds 1.5x the base. Proximity is a nudge, not a primary ranking signal.
+- **Span <= 0 case returns 1.5.** This applies when every query term sits at the same position (which only happens in pathological single-term-with-duplicates scenarios after dedup, so in practice it is a defensive branch).
+- **Decay curve.** Span of 1 token gives the full 1.5x (the formula `50/51 = 0.98` is clamped to 0.5). Span of 50 gives 1.5x. Span of 100 gives ~1.33x. Span of 1000 gives ~1.05x. The decay is asymptotic toward 1.0.
+
+**Alternatives considered**:
+- **Closest-pair span across query terms** (smarter, but quadratic across terms; on a 2-3 term query the win is invisible);
+- **Per-position dynamic-programming closest window** (the Lucene-style approach; over-engineered for a 214-document corpus);
+- **Independent additive bonus** (`score += proximity_constant * (1/span)`); pushing it into a multiplier keeps the layering clean (base × title × proximity) and avoids tuning yet another constant.
+
+**Rationale**:
+- **Proximity should bias the order, not invent new winners.** Capping at 1.5x means a TF-IDF score difference of 1.5x or more cannot be reversed by proximity alone. The base ranker still drives the macro order; proximity tiebreaks among similarly-scored documents in favour of those where the query terms cluster.
+- **`title × proximity` composes cleanly.** A title that contains every query term tightly clustered gets `2.0 * 1.5 = 3.0x` the base score; either signal alone is at most 2.0x. This is the desired property: a perfect on-topic title with tight phrasing is the strongest signal short of an exact phrase match.
+- **Single-term escape.** Bypassing the calculation for `len(terms) < 2` keeps the boost from quietly multiplying single-term queries by some constant; the test `test_proximity_returns_one_for_single_term_query` pins this.

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import difflib
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -226,7 +227,125 @@ class SearchEngine:
             if posting_lists[term][url].get("in_title", False)
         )
         title_multiplier = 1.0 + (TITLE_BOOST - 1.0) * (title_hits / len(terms))
-        return base * title_multiplier
+        proximity_multiplier = self._proximity_boost(url, terms, posting_lists)
+        return base * title_multiplier * proximity_multiplier
+
+    def _proximity_boost(
+        self,
+        url: str,
+        terms: list[str],
+        posting_lists: dict[str, dict[str, dict[str, Any]]],
+    ) -> float:
+        """Proximity multiplier in `[1.0, 1.5]` based on how tightly query terms cluster.
+
+        Single-term queries cannot have proximity, so they return `1.0`
+        unconditionally. The document-wide span is computed across query
+        terms (`max(last_position) - min(first_position)`); a span <= 0
+        (all query terms at the same position) returns the maximum 1.5x.
+        Otherwise the boost decays smoothly toward 1.0 as the span grows.
+        """
+        if len(terms) < 2:
+            return 1.0
+
+        first_positions: list[int] = []
+        last_positions: list[int] = []
+        for term in terms:
+            positions = posting_lists[term][url].get("positions", [])
+            if not positions:
+                return 1.0
+            first_positions.append(int(min(positions)))
+            last_positions.append(int(max(positions)))
+
+        span = max(last_positions) - min(first_positions)
+        if span <= 0:
+            return 1.5
+        return 1.0 + min(0.5, 50.0 / (span + 50.0))
+
+    def _make_snippet(
+        self,
+        url: str,
+        terms: list[str],
+        posting_lists: dict[str, dict[str, dict[str, Any]]],
+    ) -> str:
+        """Extract a `SNIPPET_WINDOW`-character window around the earliest matched term.
+
+        Snippets are sliced from the per-document `body_excerpt` cached on
+        the index in Session 2.2, not re-extracted from HTML. When the
+        excerpt is empty or none of the query terms appear in it, falls
+        back to the document title truncated to `SNIPPET_WINDOW`. Ellipsis
+        prefixes/suffixes flag a mid-document window. Internal whitespace
+        is collapsed so the snippet renders on a single line in the CLI.
+        """
+        doc = self.index.documents.get(url, {})
+        excerpt: str = doc.get("body_excerpt", "")
+        title: str = doc.get("title", "")
+
+        if not excerpt:
+            return title[:SNIPPET_WINDOW]
+
+        lower = excerpt.lower()
+        earliest = -1
+        for term in terms:
+            position = lower.find(term)
+            if position != -1 and (earliest == -1 or position < earliest):
+                earliest = position
+
+        if earliest == -1:
+            return title[:SNIPPET_WINDOW]
+
+        half = SNIPPET_WINDOW // 2
+        start = max(0, earliest - half)
+        end = min(len(excerpt), start + SNIPPET_WINDOW)
+        window = excerpt[start:end]
+
+        if start > 0:
+            window = "..." + window
+        if end < len(excerpt):
+            window = window + "..."
+
+        return re.sub(r"\s+", " ", window).strip()
+
+    def format_find_results(
+        self, query: str, results: list[SearchResult]
+    ) -> str:
+        """Render the results of `find` for CLI display.
+
+        Empty-query inputs return a brief usage line. Zero-match queries
+        return a "No pages contain all of: ..." line and offer difflib
+        suggestions for every query term that has no postings. Non-empty
+        results are listed with URL, title, score, matched terms, and
+        snippet on consecutive lines, with a leading "Ranking: ..." line
+        so the user can tell which scorer produced the order.
+        """
+        if not results:
+            terms = self.normalise_query(query)
+            if not terms:
+                return "Empty query. Try `find <words>`."
+            lines = [f"No pages contain all of: {query}"]
+            for term in terms:
+                if not self.index.get_term(term):
+                    close = self.suggest(term)
+                    if close:
+                        lines.append(
+                            f"  {term}: did you mean {', '.join(close)}?"
+                        )
+            return "\n".join(lines)
+
+        lines = [
+            f"Found {len(results)} matching page(s) for: {query}",
+            f"Ranking: {self.ranking.upper()}",
+            "",
+        ]
+        for result in results:
+            lines.append(f"  URL: {result.url}")
+            if result.title:
+                lines.append(f"  Title: {result.title}")
+            lines.append(f"  Score: {result.score:.4f}")
+            lines.append(f"  Matched: {', '.join(result.matched_terms)}")
+            if result.snippet:
+                lines.append(f"  Snippet: {result.snippet}")
+            lines.append("")
+        return "\n".join(lines).rstrip()
 
     def find(self, query: str, limit: int = 20) -> list[SearchResult]:
         """Conjunctive AND search across `query` terms.
@@ -278,7 +397,7 @@ class SearchEngine:
                     title=title,
                     score=score,
                     matched_terms=list(terms),
-                    snippet="",
+                    snippet=self._make_snippet(url, terms, posting_lists),
                     frequencies=frequencies,
                 )
             )
