@@ -30,13 +30,13 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 2.4 (real-crawl launcher script + live crawl completed)
-Test count: 66 (24 crawler, 30 indexer, 10 storage, 2 smoke)
-Coverage: 96% on src/crawler.py (119/124), 93% on src/indexer.py (103/111), 94% on src/storage.py (34/36); total project coverage 94.49%.
+Last session completed: 2.5 (SearchEngine with single-term lookup and conjunctive AND)
+Test count: 75 (24 crawler, 30 indexer, 10 storage, 9 search, 2 smoke)
+Coverage: crawler 96%, indexer 93%, storage 94%, search 96%; total project coverage 94.89%.
 Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes.
 HTML fixtures captured: tests/fixtures/page1.html (11021 B), page2.html (13699 B), page3.html (9987 B).
-real_crawl_started=true, real_crawl_completed=true. data/index.json exists on disk (~4.3 MB, 4729 terms, 214 pages, crawled in 21.9 min). Index file is NOT yet committed — that commit belongs to Session 3.6.
-Next session: 2.5 (search foundations: AND intersection)
+real_crawl_completed=true. data/index.json exists on disk (~4.3 MB, 4729 terms, 214 pages). Index file is NOT yet committed — that commit belongs to Session 3.6.
+Next session: 2.6 (TF-IDF with title boost)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -49,3 +49,4 @@ Next session: 2.5 (search foundations: AND intersection)
 2.2 InvertedIndex with positions, field weighting, body excerpt
 2.3 to_dict/from_dict + JSON storage with atomic writes
 2.4 real-crawl launcher script + live crawl (214 pages, 4729 terms, 21.9 min)
+2.5 SearchEngine with single-term lookup and conjunctive AND

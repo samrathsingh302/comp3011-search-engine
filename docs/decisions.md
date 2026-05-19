@@ -238,3 +238,18 @@ A running log of design choices made during the build. Each entry captures the d
 - **`data/index.json` is committed in Session 3.6**, not here. This session ships the *launcher*, not its output, so the commit message stays honest. Session 3.6 owns the `data:` commit that adds the JSON itself.
 
 **AI note**: First-pass `run_real_crawl.ps1` used `python -c "$pythonCode"`. PowerShell's Win32-argv encoding does not escape embedded `"` characters when interpolating a variable into a native command line, so the double-quoted strings in the Python source arrived at `python.exe` unquoted. Python crashed at parse time on `print(Starting real crawl...)` — `SyntaxError: '(' was never closed`. Switched the script to pipe the source via stdin to `python -`, which preserves the source verbatim because pipes bypass argv-encoding entirely. Verified with a small probe before the user re-ran the full 22-minute crawl.
+
+## 2026-05-19 — Shortest-list-first conjunctive evaluation
+
+**Decision**: `SearchEngine.find` evaluates a multi-term query by AND-intersection of posting URL sets, processed in ascending order of posting-list length. The score is sum-of-frequencies for now (TF only); TF-IDF lands in Session 2.6 and BM25 in Session 3.1. The `ranking` constructor parameter is in place from day one with validation against `{"tfidf", "bm25"}` so the Session 3.3 `--ranking` CLI flag does not need a refactor.
+
+**Alternatives considered**:
+- **Doc-at-a-time scan** (iterate every document, check whether every query term hits): O(N*K) where N is the corpus size and K is the query length, dominated by the docs that match nothing;
+- **Hash-set intersection without ordering** (intersect every term's URL set in whatever order Python's dict gave them): correct but does more work than needed;
+- **Skip-pointer-accelerated intersection** (per Lecture 13): overkill at 214 documents; the win is asymptotic and we have no skip-pointers in the posting list anyway.
+
+**Rationale**:
+- **Shortest list first** is Lecture 13's posting-list intersection optimisation. Starting from the smallest set means each subsequent intersection pass touches at most `len(shortest_list)` URLs. With a typical web query (one rare term, one common), this turns a `O(N_common)` problem into `O(N_rare)`. On a 214-document corpus the absolute wall time is negligible, but the algorithm is the textbook answer the marker will be looking for in the video walkthrough.
+- **Dedup query terms while preserving order** so that a query like `cat cat` does not double-count `frequency(cat)` into the score. The dedup is order-preserving (Python `dict.fromkeys`-style) so that `matched_terms` on the result still reflects the user's input shape.
+- **Ranking parameter validated at construction time** so an invalid `--ranking bogus` from the CLI fails fast with a friendly `ValueError("Unknown ranking 'bogus'; expected one of ['bm25', 'tfidf'])`, never a deep-stack KeyError mid-query.
+- **`SearchResult.frequencies`** is populated even when scoring is still naive, so Session 3.2's snippet generator can read the per-term counts straight off the result rather than re-querying the index.
