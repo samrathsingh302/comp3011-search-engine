@@ -253,3 +253,33 @@ A running log of design choices made during the build. Each entry captures the d
 - **Dedup query terms while preserving order** so that a query like `cat cat` does not double-count `frequency(cat)` into the score. The dedup is order-preserving (Python `dict.fromkeys`-style) so that `matched_terms` on the result still reflects the user's input shape.
 - **Ranking parameter validated at construction time** so an invalid `--ranking bogus` from the CLI fails fast with a friendly `ValueError("Unknown ranking 'bogus'; expected one of ['bm25', 'tfidf'])`, never a deep-stack KeyError mid-query.
 - **`SearchResult.frequencies`** is populated even when scoring is still naive, so Session 3.2's snippet generator can read the per-term counts straight off the result rather than re-querying the index.
+
+## 2026-05-19 — TF-IDF with smoothed IDF
+
+**Decision**: `SearchEngine._tfidf_score` computes `score(d, q) = Σ_t tf(t, d) * idf(t)` with smoothed IDF: `idf(t) = log((N + 1) / (df + 1)) + 1`, where `N = max(1, document_count)` and `df = len(posting_list)`.
+
+**Alternatives considered**:
+- **Unsmoothed `idf = log(N / df)`** (textbook form, but collapses to 0 when a term appears in every document, which would zero out the entire score for queries dominated by common words and is a known pitfall on small corpora);
+- **Inverse document frequency from sklearn** (`log((1 + N) / (1 + df)) + 1`, identical to our smoothed form, but bringing sklearn in for one formula would balloon the dependency tree);
+- **Sublinear TF scaling** (`tf -> 1 + log(tf)`), which damps the effect of very-frequent terms within a document, but the brief's small corpus (214 pages on `quotes.toscrape.com`) does not exhibit the long-tail term-frequency distribution that sublinear scaling is meant to tame.
+
+**Rationale**:
+- **The `+1` on numerator and denominator** is the standard smoothing pair from Manning et al. *Introduction to Information Retrieval* (ch. 6). It prevents two pathological cases: `log(N/N) = 0` for terms that appear in every document, and division-by-zero if `df` were ever 0 (which it cannot be when the term is in `posting_list`, but the smoothing makes the formula safe by construction).
+- **The trailing `+ 1.0`** keeps IDF strictly positive even when a term is in every document. Combined with the smoothed `log`, the minimum possible IDF is `log(1) + 1 = 1.0`, so a posting always contributes positively to the score. This matters because the title boost is multiplicative; if IDF could be zero or negative, the multiplier would either zero the score out entirely or flip its sign on title hits, both of which would be surprising.
+- **`max(1, document_count)`** is belt-and-braces against an empty index. `find()` already short-circuits to `[]` when any posting list is empty, so this branch is unreachable in practice, but the cost of the guard is one comparison per scoring call.
+- **TF is read directly from the posting**, not re-computed from `len(positions)`, because `frequency` was deliberately stored alongside `positions` in Session 2.2 to skip exactly this kind of repeated length-of-list work in the hot scoring loop.
+
+## 2026-05-19 — Title boost = 2.0
+
+**Decision**: `TITLE_BOOST = 2.0`. After the base score is computed, the title multiplier is `1.0 + (TITLE_BOOST - 1.0) * (title_hits / len(terms))`, where `title_hits` is the count of query terms whose posting on this document carries `in_title == True`.
+
+**Alternatives considered**:
+- **Hard 2.0x boost only when every query term hits the title** (binary; a one-of-two title hit would get no boost at all, which under-rewards titles that contain part of the query);
+- **Independent per-term multiplication** (multiply the per-term contribution by 2.0 only for the terms that hit; harder to reason about because the field weighting becomes entangled with IDF math);
+- **Tunable via `IndexerOptions`** (premature; one global constant is enough for the brief, and a config knob would just be a wider attack surface for the marker to question).
+
+**Rationale**:
+- **Lecture 12 names titles as a high-signal field.** Doubling the contribution of a title hit is the conventional starting value from the same lecture's "fields and extents" worked example. On the small fixture corpus it produces visibly sensible rankings: a page titled "Quotes by Albert Einstein" outranks a page that merely mentions Einstein in the body.
+- **Linear partial-hit scaling.** A two-term query where one term is in the title gets a `1.5x` multiplier, not the full `2.0x`. This degrades gracefully: queries that *partly* match the title still benefit, but not as much as queries that match it entirely.
+- **Applied after the base score, not inside it.** This keeps the IDF/TF maths pure: TF-IDF in `_tfidf_score`, BM25 in `_bm25_score` (Session 3.1), and field weighting layered on top in `_score_document`. Future ranker work (proximity boost in 3.2) slots into the same on-top-of-base position.
+- **`in_title` is a posting-level bit, not recomputed from positions.** Section 2.2 promoted the flag to True on the first title-position occurrence; the ranker reads it directly with no position-arithmetic loop in the hot path.

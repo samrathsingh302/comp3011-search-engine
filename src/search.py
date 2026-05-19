@@ -4,6 +4,7 @@ See Lecture 12 (indexing) and Lecture 13 (query processing)."""
 from __future__ import annotations
 
 import difflib
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -117,14 +118,71 @@ class SearchEngine:
             word, self.index.vocabulary, n=n, cutoff=0.7
         )
 
+    def _tfidf_score(
+        self,
+        url: str,
+        terms: list[str],
+        posting_lists: dict[str, dict[str, dict[str, Any]]],
+    ) -> float:
+        """TF-IDF base score for `url` across the query `terms`.
+
+        Smoothed IDF: `idf(t) = log((N + 1) / (df + 1)) + 1`. The `+1` on
+        each side prevents `log(N/N) = 0` when every document contains the
+        term (which would collapse the score to zero for queries dominated
+        by common words), and the trailing `+ 1` keeps IDF strictly
+        positive even on rare-everywhere corpora.
+        """
+        n_docs = max(1, self.index.document_count)
+        score = 0.0
+        for term in terms:
+            postings = posting_lists[term]
+            df = len(postings)
+            tf = postings[url].get("frequency", 0)
+            idf = math.log((n_docs + 1) / (df + 1)) + 1.0
+            score += float(tf) * idf
+        return score
+
+    def _score_document(
+        self,
+        url: str,
+        terms: list[str],
+        posting_lists: dict[str, dict[str, dict[str, Any]]],
+    ) -> float:
+        """Dispatch on `self.ranking` and apply the title-field boost.
+
+        The base ranking number comes from `_tfidf_score` (or, from Session
+        3.1 onwards, `_bm25_score`). The title multiplier is then applied
+        on top: a document whose title contains every query term gets the
+        full `TITLE_BOOST` factor; partial title hits scale linearly.
+        """
+        if self.ranking == "tfidf":
+            base = self._tfidf_score(url, terms, posting_lists)
+        elif self.ranking == "bm25":
+            # BM25 maths arrives in Session 3.1; until then, the dispatch
+            # surface is wired but calling find() with ranking="bm25"
+            # raises so callers do not get a silently-wrong score.
+            raise NotImplementedError(
+                "BM25 ranking arrives in Session 3.1"
+            )
+        else:  # pragma: no cover - __init__ validation prevents this branch
+            raise RuntimeError(f"unhandled ranking: {self.ranking}")
+
+        title_hits = sum(
+            1
+            for term in terms
+            if posting_lists[term][url].get("in_title", False)
+        )
+        title_multiplier = 1.0 + (TITLE_BOOST - 1.0) * (title_hits / len(terms))
+        return base * title_multiplier
+
     def find(self, query: str, limit: int = 20) -> list[SearchResult]:
         """Conjunctive AND search across `query` terms.
 
         Lecture 13's shortest-list-first heuristic: posting lists are sorted
         by length and intersection proceeds from the shortest. Empty query
-        or any term with no postings yields `[]`. The current scorer is a
-        plain sum of frequencies; TF-IDF arrives in Session 2.6 and BM25
-        in Session 3.1.
+        or any term with no postings yields `[]`. Scoring goes through
+        `_score_document`, which delegates to `_tfidf_score` and then
+        applies the title-field boost.
         """
         raw_terms = self.normalise_query(query)
         if not raw_terms:
@@ -155,12 +213,11 @@ class SearchEngine:
 
         results: list[SearchResult] = []
         for url in candidate_urls:
-            frequencies: dict[str, int] = {}
-            score = 0.0
-            for term in terms:
-                freq = int(posting_lists[term][url].get("frequency", 0))
-                frequencies[term] = freq
-                score += float(freq)
+            frequencies: dict[str, int] = {
+                term: int(posting_lists[term][url].get("frequency", 0))
+                for term in terms
+            }
+            score = self._score_document(url, terms, posting_lists)
             title = self.index.documents.get(url, {}).get("title", "")
             results.append(
                 SearchResult(

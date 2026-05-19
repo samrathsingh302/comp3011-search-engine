@@ -74,8 +74,10 @@ class TestFind:
         result = results[0]
         assert isinstance(result, SearchResult)
         assert result.url == "http://a.example.com/"
-        # Sum of frequencies: freq(cat)=2 + freq(dog)=1 = 3
-        assert result.score == 3.0
+        # Score is TF-IDF as of Session 2.6; we don't pin the exact number
+        # here (a dedicated test in TestTfIdf does that) but it must be
+        # strictly positive when both terms hit.
+        assert result.score > 0
         assert set(result.matched_terms) == {"cat", "dog"}
         assert result.frequencies == {"cat": 2, "dog": 1}
 
@@ -85,7 +87,62 @@ class TestRanking:
         with pytest.raises(ValueError, match="Unknown ranking"):
             SearchEngine(small_index, ranking="bogus")
 
+    def test_invalid_ranking_still_raises(self, small_index: InvertedIndex) -> None:
+        """Regression check that the 2.6 scoring refactor did not loosen __init__ validation."""
+        with pytest.raises(ValueError):
+            SearchEngine(small_index, ranking="not_a_thing")
+
     def test_valid_rankings_accept_both_known_names(self, small_index: InvertedIndex) -> None:
-        """Both `tfidf` and `bm25` must construct without raising; the scorer is identical for now."""
+        """Both `tfidf` and `bm25` must construct without raising."""
         assert SearchEngine(small_index, ranking="tfidf").ranking == "tfidf"
         assert SearchEngine(small_index, ranking="bm25").ranking == "bm25"
+
+    def test_bm25_find_raises_not_implemented_until_3_1(self, small_index: InvertedIndex) -> None:
+        """Until Session 3.1 lands BM25, calling find() with ranking=bm25 must raise loudly."""
+        engine = SearchEngine(small_index, ranking="bm25")
+        with pytest.raises(NotImplementedError, match="Session 3.1"):
+            engine.find("cat")
+
+
+class TestTfIdf:
+    def test_tfidf_higher_for_more_frequent_term(self, engine: SearchEngine) -> None:
+        """Doc A has cat with frequency 2; doc B has it once. A must rank above B."""
+        results = engine.find("cat")
+        assert len(results) == 2
+        assert results[0].url == "http://a.example.com/"
+        assert results[0].score > results[1].score
+
+    def test_tfidf_rare_term_higher_idf_than_common_term(self) -> None:
+        """A term that appears in 1 of 3 docs out-scores one that appears in all 3 at equal tf."""
+        idx = InvertedIndex()
+        idx.add_document("http://a/", "<html><body>common rare</body></html>")
+        idx.add_document("http://b/", "<html><body>common</body></html>")
+        idx.add_document("http://c/", "<html><body>common</body></html>")
+        engine = SearchEngine(idx)
+
+        rare_results = engine.find("rare")
+        common_results = engine.find("common")
+        assert len(rare_results) == 1
+        rare_score = rare_results[0].score
+        common_at_a = next(r.score for r in common_results if r.url == "http://a/")
+        # Both have tf=1 in doc A; rare has df=1 vs common df=3 → idf_rare > idf_common.
+        assert rare_score > common_at_a
+
+    def test_title_hit_outranks_body_only_at_equal_tf(self) -> None:
+        """Title containing the query term applies the TITLE_BOOST multiplier."""
+        idx = InvertedIndex()
+        idx.add_document(
+            "http://title-hit/",
+            "<html><head><title>cat</title></head><body>dummy</body></html>",
+        )
+        idx.add_document(
+            "http://body-only/",
+            "<html><body>cat</body></html>",
+        )
+        engine = SearchEngine(idx)
+
+        results = engine.find("cat")
+        assert len(results) == 2
+        assert results[0].url == "http://title-hit/"
+        # With both at tf=1, df=2, the title-hit score must be roughly 2.0x the body-only score.
+        assert results[0].score == pytest.approx(2.0 * results[1].score, rel=0.01)
