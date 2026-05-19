@@ -30,12 +30,12 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 4.1 (comprehensive README with architecture, benchmarks, and ranking comparison)
+Last session completed: 4.2 (GenAI critical evaluation drawn from decisions log)
 Test count: 127. Coverage 100% on all src/ modules. ruff + mypy clean.
-README.md: 212 lines. All sections present, every output block traceable to docs/sample_output.txt / docs/scale_benchmark.txt / docs/ranking_comparison.txt (no placeholders).
-docs/ranking_comparison.txt generated via scripts/ranking_comparison.py — TFIDF vs BM25 top-3 for 5 canonical queries.
+GENAI_EVALUATION.md: 174 lines, 8 sections per spec. Section 3 quotes 14 verbatim AI-correction events from docs/decisions.md (12 blocks, 14 sub-bullets). Section 7 cites 26 commits from `git rev-list --count HEAD`.
+README.md: 212 lines, all sections present with real output from sample/benchmark/ranking files.
 data/index.json committed (~4.2 MB, 4729 terms, 214 pages).
-Next session: 4.2 (GenAI evaluation)
+Next session: 4.3 (video script)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -57,3 +57,4 @@ Next session: 4.2 (GenAI evaluation)
 3.5 end-to-end integration tests + coverage push to 100%
 3.6 commit real index, manual sanity check, scale benchmark
 4.1 comprehensive README with architecture, benchmarks, and ranking comparison
+4.2 GenAI critical evaluation drawn from decisions log (14 verbatim AI-note events)

@@ -494,3 +494,18 @@ A running log of design choices made during the build. Each entry captures the d
 **One observation actually visible in the table**: on `good friends`, **TF-IDF puts `tag/friends/` at #1 (score 24.887)** while **BM25 puts `tag/contentment/page/1/` at #1 (score 5.443)**. The contentment page contains the actual Mark Twain quote ("Good friends, good books, and a sleepy conscience: this is the ideal life.") but is shorter than the friends-tag page. BM25's length normalisation amplifies the per-token contribution of `good` and `friends` in the short page, while TF-IDF rewards the friends-tag page's higher raw term frequency. This is the textbook discriminator between the two algorithms made concrete, with real scores rather than a hand-waved "BM25 prefers shorter documents" claim.
 
 **Alternatives considered**: include only a TF-IDF table (would hide the very property — length normalisation — that motivated implementing BM25 in the first place); include the full top-20 per query (overwhelms the reader; the top 3 already shows the divergence); generate the comparison once and freeze it (the script is checked in so a re-crawl can refresh the table without losing the README narrative).
+
+## 2026-05-19 — GenAI evaluation written
+
+**Decision**: `GENAI_EVALUATION.md` written with the eight required sections. Section 3 ("Where AI Made Mistakes I Had to Correct") quotes **14 distinct AI-correction events** verbatim from this `docs/decisions.md`, organised by the parent decision section and dated to match the source. Two of the AI note blocks (`Body excerpt cap = 2 KB per document` and `CLI tests with mocked Crawler`) each contain two sub-bullets, making 12 AI-note blocks and 14 sub-bullets total.
+
+**Sources used in the evaluation**:
+- `docs/decisions.md` (this file): the authoritative source for every Section 3 quote and for the Section 8 appendix.
+- `git rev-list --count HEAD` at write time: 26 commits, quoted in Section 7.
+- `git log --oneline --decorate -30`: referenced in Section 6 for the specific commits the AI-saved time was reinvested into.
+- `README.md`: cross-linked in Section 7 under "GenAI declaration".
+- File paths in `src/`, `tests/`, `scripts/`, and `docs/`: enumerated in Section 2 for "where AI helped".
+
+**No invented entries.** The Pre-flight count was 14, matched the actual Section 3 entries on output, and was authorised by the user before writing began. The evaluation does not generalise beyond what these 14 events evidence; Section 4's three-category breakdown ("platform compatibility traps", "type-correctness issues", "design-judgement calls") maps every event to exactly one category with examples cited by name.
+
+**Section 8 appendix**: reproduces the substantive content of `docs/decisions.md` with all 14 AI-note sub-bullets verbatim; the surrounding architectural rationale prose is condensed in the appendix to keep `GENAI_EVALUATION.md` under 200 lines while still containing every AI-correction event as primary evidence. The full original `docs/decisions.md` is committed in the repository.
