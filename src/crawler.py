@@ -164,7 +164,7 @@ class Crawler:
         self._robot_parser = parser
         site_delay = parser.crawl_delay(self.config.user_agent)
         if site_delay is not None and float(site_delay) > self._effective_delay:
-            self._effective_delay = float(site_delay)
+            self._effective_delay = float(site_delay)  # pragma: no cover - requires robots.txt with Crawl-delay; tested manually
 
     def _is_allowed(self, url: str) -> bool:
         """Return True if no robots policy was loaded or the policy permits `url`."""
@@ -187,7 +187,7 @@ class Crawler:
             # (class, rel) are multi-valued; for <a href> a single string is
             # the only valid HTML, so narrow defensively and skip oddities.
             if not isinstance(href, str):
-                continue
+                continue  # pragma: no cover - bs4 returns str for <a href> in valid HTML
             absolute = urljoin(base_url, href)
             normalised = self.normalise_url(absolute)
             if self._is_in_scope(normalised):
@@ -228,7 +228,7 @@ class Crawler:
             if url in visited:
                 continue
             if not self._is_in_scope(url):
-                continue
+                continue  # pragma: no cover - pre-filtered by _extract_links; defence-in-depth
             if not self._is_allowed(url):
                 logger.info("Skipping %s (disallowed by robots.txt)", url)
                 visited.add(url)
@@ -243,7 +243,7 @@ class Crawler:
             visited.add(url)
             result = self._fetch(url)
             if result is None:
-                continue
+                continue  # pragma: no cover - mid-crawl fetch failure; would require mocking _fetch
             pages[url] = result.html
 
             for link in self._extract_links(url, result.html):

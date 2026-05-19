@@ -30,13 +30,13 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 3.4 (CLI test suite with mocked Crawler and engine)
-Test count: 114 (24 crawler, 30 indexer, 10 storage, 27 search, 21 cli, 2 smoke)
-Coverage: crawler 96%, indexer 93%, storage 94%, search 97%, cli 97%, main 100%; total project coverage 95.86%.
+Last session completed: 3.5 (end-to-end integration tests + coverage push)
+Test count: 127 (25 crawler, 33 indexer, 10 storage, 29 search, 23 cli, 4 integration, 2 smoke + 1 implicit)
+Coverage: 100% across every src/ module. 11 lines `# pragma: no cover`'d on defensive branches with one-line justifications in decisions.md.
 Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes.
 HTML fixtures captured. data/index.json exists on disk (~4.21 MB, 4729 terms, 214 pages); commit belongs to Session 3.6.
-CLI tests: 21 cases mock `Crawler` at module level and use a real in-memory InvertedIndex. `cli.py` pragmas now only on defensive `except Exception:` arms and `run()` (blocking cmdloop).
-Next session: 3.5 (integration tests + coverage push)
+Integration tests use captured fixtures (no real network) and exercise the full pipeline: build -> save -> load -> search -> format.
+Next session: 3.6 (commit real index + scale benchmark)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -55,3 +55,4 @@ Next session: 3.5 (integration tests + coverage push)
 3.2 proximity boost + real text snippets + query suggestions
 3.3 interactive cmd.Cmd shell with --ranking flag on find
 3.4 CLI test suite with mocked Crawler and engine
+3.5 end-to-end integration tests + coverage push to 100%

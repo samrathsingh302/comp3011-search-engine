@@ -189,6 +189,30 @@ class TestInvertedIndex:
         excerpt = index.documents["http://example.com/"]["body_excerpt"]
         assert len(excerpt) <= BODY_EXCERPT_CHARS
 
+    def test_get_term_with_empty_string_returns_empty(self, index: InvertedIndex) -> None:
+        """Defensive: querying for an empty string returns `{}` without touching the index."""
+        index.add_document("http://example.com/", "<html><body>cat</body></html>")
+        assert index.get_term("") == {}
+
+    def test_get_term_applies_stemmer_when_options_stem_true(self) -> None:
+        """With `IndexerOptions.stem=True`, lookups stem the query word the same way indexing did."""
+        idx = InvertedIndex(options=IndexerOptions(stem=True))
+        idx.add_document("http://example.com/", "<html><body>running</body></html>")
+        # `running` was stemmed to `run` at index time; looking up `running`
+        # must stem again so the lookup hits the `run` posting.
+        assert idx.get_term("running") != {}
+
+
+class TestPorterStemmer:
+    def test_get_porter_stemmer_caches_after_first_call(self) -> None:
+        """Second call to `_get_porter_stemmer` returns the cached instance (line 60 branch)."""
+        from src.indexer import _get_porter_stemmer
+
+        first = _get_porter_stemmer()
+        second = _get_porter_stemmer()
+        assert first is second
+        assert first is not None  # nltk is a required dep, instance is always available
+
 
 class TestSerialisation:
     def test_index_round_trip_serialisation(self, index: InvertedIndex) -> None:

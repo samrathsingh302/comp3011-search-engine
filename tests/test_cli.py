@@ -205,6 +205,13 @@ class TestFind:
         )
         assert "Usage:" in out
 
+    def test_find_with_dangling_ranking_flag_prints_usage(
+        self, shell_with_engine: Shell
+    ) -> None:
+        """`find --ranking` (no value at all) must hit the missing-value branch and print usage."""
+        out = _capture(lambda: shell_with_engine.do_find("--ranking"))
+        assert "Usage:" in out
+
 
 class TestStats:
     def test_stats_prints_page_and_term_counts(
@@ -214,6 +221,12 @@ class TestStats:
         assert "Pages:" in out
         assert "Terms:" in out
         assert "Top 10" in out
+
+    def test_stats_before_load_prints_no_index_loaded(
+        self, shell_without_engine: Shell
+    ) -> None:
+        out = _capture(lambda: shell_without_engine.do_stats(""))
+        assert "no index loaded" in out.lower()
 
 
 class TestUnknownCommand:
@@ -236,6 +249,12 @@ class TestExtras:
         out = _capture(lambda: shell_with_engine.do_benchmark(""))
         assert "ms" in out
         assert "Benchmark" in out
+
+    def test_benchmark_before_load_prints_no_index_loaded(
+        self, shell_without_engine: Shell
+    ) -> None:
+        out = _capture(lambda: shell_without_engine.do_benchmark(""))
+        assert "no index loaded" in out.lower()
 
     def test_exit_returns_true(self, shell_without_engine: Shell) -> None:
         result = shell_without_engine.do_exit("")

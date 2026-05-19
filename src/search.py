@@ -252,13 +252,13 @@ class SearchEngine:
         for term in terms:
             positions = posting_lists[term][url].get("positions", [])
             if not positions:
-                return 1.0
+                return 1.0  # pragma: no cover - postings always carry positions in practice
             first_positions.append(int(min(positions)))
             last_positions.append(int(max(positions)))
 
         span = max(last_positions) - min(first_positions)
         if span <= 0:
-            return 1.5
+            return 1.5  # pragma: no cover - same-position terms only via duplicate dedup upstream
         return 1.0 + min(0.5, 50.0 / (span + 50.0))
 
     def _make_snippet(

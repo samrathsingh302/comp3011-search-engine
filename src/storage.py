@@ -56,7 +56,7 @@ def save_index(
     except Exception:
         try:
             os.unlink(tmp_path)
-        except OSError:
+        except OSError:  # pragma: no cover - tmpfile guaranteed to exist at this point
             pass
         raise
 

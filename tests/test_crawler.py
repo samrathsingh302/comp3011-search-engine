@@ -266,3 +266,15 @@ class TestRobots:
     def test_crawler_default_delay_is_six_seconds(self) -> None:
         """Synonym for the brief-compliance test; ensures the prompt's name exists."""
         assert CrawlerConfig().delay_seconds >= 6.0
+
+    def test_load_robots_skips_when_respect_robots_false(self) -> None:
+        """With `respect_robots=False`, `_load_robots` returns immediately and never fetches."""
+        session = _make_session()
+        crawler = Crawler(
+            config=CrawlerConfig(respect_robots=False),
+            session=session,
+            sleeper=MagicMock(),
+        )
+        crawler._load_robots()
+        assert crawler._robot_parser is None
+        session.get.assert_not_called()

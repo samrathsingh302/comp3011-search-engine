@@ -57,6 +57,12 @@ class TestFormatTermEntry:
         assert "did you mean" in text.lower()
         assert "cat" in text
 
+    def test_format_term_entry_no_suggestions_for_unmatchable_word(self, engine: SearchEngine) -> None:
+        """A query token far from every vocab word should return the plain no-postings line."""
+        text = engine.format_term_entry("xyzqwerty")
+        assert "no postings" in text.lower()
+        assert "did you mean" not in text.lower()
+
 
 class TestFind:
     def test_find_empty_query_returns_empty_list(self, engine: SearchEngine) -> None:
@@ -66,6 +72,11 @@ class TestFind:
     def test_find_returns_empty_when_any_term_missing(self, engine: SearchEngine) -> None:
         # 'cat' is in both docs, 'zzzznonexistent' is in neither.
         assert engine.find("cat zzzznonexistent") == []
+
+    def test_find_with_disjoint_terms_returns_empty(self, engine: SearchEngine) -> None:
+        """Two terms that exist individually but never co-occur trigger the mid-loop empty-set escape."""
+        # `bird` is only in doc B; `fish` is only in doc A; their intersection is empty.
+        assert engine.find("bird fish") == []
 
     def test_find_intersection_two_terms(self, engine: SearchEngine) -> None:
         """`cat dog` matches only doc A (cat is in both, dog only in A)."""

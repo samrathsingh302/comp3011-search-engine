@@ -61,7 +61,7 @@ def _get_porter_stemmer() -> Any:
     _stemmer_initialised = True
     try:
         from nltk.stem import PorterStemmer
-    except ImportError:
+    except ImportError:  # pragma: no cover - nltk is a required runtime dep
         _porter_stemmer = None
         return None
     _porter_stemmer = PorterStemmer()
