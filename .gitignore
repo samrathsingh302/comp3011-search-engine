@@ -38,3 +38,7 @@ desktop.ini
 nltk_data/
 
 # Note: data/index.json IS tracked. It is the deliverable from the live crawl.
+
+# Instructor-provided verifier tool; reports under docs/ ARE tracked.
+comp3011-verifier/
+comp3011-verifier.zip
