@@ -30,12 +30,13 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 2.3 (to_dict/from_dict + JSON storage with atomic writes)
+Last session completed: 2.4 (real-crawl launcher script + live crawl completed)
 Test count: 66 (24 crawler, 30 indexer, 10 storage, 2 smoke)
-Coverage: 96% on src/crawler.py (119/124), 93% on src/indexer.py (103/111), 94% on src/storage.py (34/36); total project coverage 94.49%. Uncovered branches are all defensive (porter stemmer ImportError fallback, stemmer cache-hit branch, scope re-check on dequeue, robots non-200 log, fetch-None skip, tmp-cleanup OSError swallow).
-Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes (no longer gitignored).
+Coverage: 96% on src/crawler.py (119/124), 93% on src/indexer.py (103/111), 94% on src/storage.py (34/36); total project coverage 94.49%.
+Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes.
 HTML fixtures captured: tests/fixtures/page1.html (11021 B), page2.html (13699 B), page3.html (9987 B).
-Next session: 2.4 (kick off real crawl in background)
+real_crawl_started=true, real_crawl_completed=true. data/index.json exists on disk (~4.3 MB, 4729 terms, 214 pages, crawled in 21.9 min). Index file is NOT yet committed — that commit belongs to Session 3.6.
+Next session: 2.5 (search foundations: AND intersection)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -47,3 +48,4 @@ Next session: 2.4 (kick off real crawl in background)
 2.1 tokeniser with edge cases + mypy
 2.2 InvertedIndex with positions, field weighting, body excerpt
 2.3 to_dict/from_dict + JSON storage with atomic writes
+2.4 real-crawl launcher script + live crawl (214 pages, 4729 terms, 21.9 min)

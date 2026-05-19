@@ -220,3 +220,21 @@ A running log of design choices made during the build. Each entry captures the d
 - **Same-directory temp.** Creating the temp file in the *target's parent* is essential: `os.replace` is only atomic when source and destination live on the same filesystem. Using `/tmp` on Linux would risk a cross-mount fallback to a non-atomic copy.
 - **Best-effort cleanup.** The `except` arm tries `os.unlink(tmp_path)` and swallows the `OSError` because the operating system may have already removed the file (e.g. on certain failure paths inside `os.fdopen`). The re-raise preserves the original exception so the caller still sees what went wrong.
 - **Tested directly.** `test_atomic_write_leaves_no_tmp_file` proves the happy path; `test_save_cleans_up_tmp_when_json_dump_fails` patches `json.dump` to raise mid-write and asserts both that no `.tmp` survives and that no `data/index.json` was created.
+
+## 2026-05-19 — Staging the real crawl during dev
+
+**Decision**: `scripts/run_real_crawl.ps1` activates the project venv and runs the full pipeline (`Crawler.crawl` -> `InvertedIndex.build_from_pages` -> `save_index`) against the live site once, in a side terminal, leaving `data/index.json` on disk for later session work to consume.
+
+**Observed result**: 214 pages crawled in 21.9 minutes at the brief's 6 second politeness window. 4,729 distinct terms indexed. Resulting `data/index.json` is ~4.3 MB. The corpus is larger than the rough "~60 pages in 6-10 minutes" estimate that lived in the original plan because `quotes.toscrape.com` exposes a per-author page and a per-tag page in addition to the 10 main pagination pages, and BFS reaches all of them.
+
+**Alternatives considered**:
+- Skipping the live crawl and indexing only the 3 captured fixtures (gets `data/index.json` to ~30 KB; useful as a fallback when the site is unreachable, but loses the corpus realism that 3.6's benchmark needs);
+- Crawling on every CI run (would waste the politeness budget, make CI flaky, and isn't what the brief asks for — CI tests run on mocks, not the live site);
+- Pinning a snapshot of `quotes.toscrape.com` to a local mirror (overkill; site is stable enough that one capture per development run is fine).
+
+**Rationale**:
+- **The corpus has to be real to write a credible README benchmark.** Synthetic data could make TF-IDF and BM25 differ trivially; a real corpus exposes the actual behaviour the marker will see.
+- **Side terminal not background job.** The script is intentionally foreground in its own PowerShell window so the user can watch progress, interrupt cleanly with Ctrl-C, and confirm the 6-second politeness is being honoured. A `Start-Job` background runner would obscure all three.
+- **`data/index.json` is committed in Session 3.6**, not here. This session ships the *launcher*, not its output, so the commit message stays honest. Session 3.6 owns the `data:` commit that adds the JSON itself.
+
+**AI note**: First-pass `run_real_crawl.ps1` used `python -c "$pythonCode"`. PowerShell's Win32-argv encoding does not escape embedded `"` characters when interpolating a variable into a native command line, so the double-quoted strings in the Python source arrived at `python.exe` unquoted. Python crashed at parse time on `print(Starting real crawl...)` — `SyntaxError: '(' was never closed`. Switched the script to pipe the source via stdin to `python -`, which preserves the source verbatim because pipes bypass argv-encoding entirely. Verified with a small probe before the user re-ran the full 22-minute crawl.
