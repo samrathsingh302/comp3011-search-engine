@@ -30,14 +30,12 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 3.6 (commit real index + scale benchmark). End of Day 3.
-Test count: 127. Coverage 100% on all src/ modules (11 lines pragma'd on defensive branches).
-Linter: ruff clean. Type checker: mypy clean. Deps pinned.
-data/index.json COMMITTED (~4.2 MB, 4729 terms, 214 pages).
-docs/sample_output.txt captured from `python -m src.main` driving the load/print/find/stats sequence (234 lines).
-docs/scale_benchmark.txt holds median timings across {5, 10, 25, 50, 214}-doc subsets for 5 canonical queries.
-At 214 docs the slowest query (TF-IDF on `life`) is 2.6 ms median; rare-term query (`indifference`) is 0.17 ms.
-Next session: 4.1 (README)
+Last session completed: 4.1 (comprehensive README with architecture, benchmarks, and ranking comparison)
+Test count: 127. Coverage 100% on all src/ modules. ruff + mypy clean.
+README.md: 212 lines. All sections present, every output block traceable to docs/sample_output.txt / docs/scale_benchmark.txt / docs/ranking_comparison.txt (no placeholders).
+docs/ranking_comparison.txt generated via scripts/ranking_comparison.py — TFIDF vs BM25 top-3 for 5 canonical queries.
+data/index.json committed (~4.2 MB, 4729 terms, 214 pages).
+Next session: 4.2 (GenAI evaluation)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -58,3 +56,4 @@ Next session: 4.1 (README)
 3.4 CLI test suite with mocked Crawler and engine
 3.5 end-to-end integration tests + coverage push to 100%
 3.6 commit real index, manual sanity check, scale benchmark
+4.1 comprehensive README with architecture, benchmarks, and ranking comparison

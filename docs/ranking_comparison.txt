@@ -1,0 +1,32 @@
+| query | ranking | rank | score | url |
+|---|---|---|---|---|
+| `love` | tfidf | 1 | 27.427 | https://quotes.toscrape.com/tag/love/ |
+| `love` | tfidf | 2 | 27.427 | https://quotes.toscrape.com/tag/love/page/1/ |
+| `love` | tfidf | 3 | 13.713 | https://quotes.toscrape.com/tag/love/page/2/ |
+| `love` | bm25 | 1 | 0.541 | https://quotes.toscrape.com/tag/love/page/2/ |
+| `love` | bm25 | 2 | 0.524 | https://quotes.toscrape.com/tag/romantic/page/1/ |
+| `love` | bm25 | 3 | 0.524 | https://quotes.toscrape.com/tag/women/page/1/ |
+| `life` | tfidf | 1 | 21.349 | https://quotes.toscrape.com/tag/life/page/1/ |
+| `life` | tfidf | 2 | 21.349 | https://quotes.toscrape.com/tag/life/ |
+| `life` | tfidf | 3 | 10.113 | https://quotes.toscrape.com/page/2/ |
+| `life` | bm25 | 1 | 0.272 | https://quotes.toscrape.com/tag/life/page/2/ |
+| `life` | bm25 | 2 | 0.268 | https://quotes.toscrape.com/tag/yourself/page/1/ |
+| `life` | bm25 | 3 | 0.264 | https://quotes.toscrape.com/tag/life/page/1/ |
+| `world` | tfidf | 1 | 7.376 | https://quotes.toscrape.com/tag/world/page/1/ |
+| `world` | tfidf | 2 | 7.376 | https://quotes.toscrape.com/author/Albert-Einstein |
+| `world` | tfidf | 3 | 7.376 | https://quotes.toscrape.com/author/Helen-Keller |
+| `world` | bm25 | 1 | 2.917 | https://quotes.toscrape.com/tag/world/page/1/ |
+| `world` | bm25 | 2 | 2.645 | https://quotes.toscrape.com/tag/change/page/1/ |
+| `world` | bm25 | 3 | 2.645 | https://quotes.toscrape.com/tag/deep-thoughts/page/1/ |
+| `good friends` | tfidf | 1 | 24.887 | https://quotes.toscrape.com/tag/friends/ |
+| `good friends` | tfidf | 2 | 24.887 | https://quotes.toscrape.com/tag/friends/page/1/ |
+| `good friends` | tfidf | 3 | 20.788 | https://quotes.toscrape.com/page/2/ |
+| `good friends` | bm25 | 1 | 5.443 | https://quotes.toscrape.com/tag/contentment/page/1/ |
+| `good friends` | bm25 | 2 | 5.241 | https://quotes.toscrape.com/tag/good/page/1/ |
+| `good friends` | bm25 | 3 | 4.165 | https://quotes.toscrape.com/tag/aliteracy/page/1/ |
+| `indifference` | tfidf | 1 | 23.314 | https://quotes.toscrape.com/tag/indifference/page/1/ |
+| `indifference` | tfidf | 2 | 19.429 | https://quotes.toscrape.com/tag/hate/page/1/ |
+| `indifference` | tfidf | 3 | 19.429 | https://quotes.toscrape.com/tag/inspirational/page/1/ |
+| `indifference` | bm25 | 1 | 6.359 | https://quotes.toscrape.com/tag/indifference/page/1/ |
+| `indifference` | bm25 | 2 | 6.196 | https://quotes.toscrape.com/tag/hate/page/1/ |
+| `indifference` | bm25 | 3 | 6.196 | https://quotes.toscrape.com/tag/apathy/page/1/ |
