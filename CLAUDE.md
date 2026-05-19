@@ -30,12 +30,12 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 4.2 (GenAI critical evaluation drawn from decisions log)
+Last session completed: 4.3 (word-for-word video script + teleprompter)
 Test count: 127. Coverage 100% on all src/ modules. ruff + mypy clean.
-GENAI_EVALUATION.md: 174 lines, 8 sections per spec. Section 3 quotes 14 verbatim AI-correction events from docs/decisions.md (12 blocks, 14 sub-bullets). Section 7 cites 26 commits from `git rev-list --count HEAD`.
-README.md: 212 lines, all sections present with real output from sample/benchmark/ranking files.
-data/index.json committed (~4.2 MB, 4729 terms, 214 pages).
-Next session: 4.3 (video script)
+docs/video_script.md: 49 lines, 398 spoken words across `> ...` blocks. Estimated read-aloud time 2:51-3:19; with ~70s of demo action, total 4:10-4:30 (target was 4:30, ceiling 4:50).
+scripts/demo_runner.py: stdin-press-Enter teleprompter showing each demo command on a side monitor.
+GenAI section of video cites 2 events verbatim from GENAI_EVALUATION.md Section 3: emptyline -> None mypy catch, and PowerShell -c quote stripping.
+Next session: 4.4 (push to GitHub, verify CI)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -58,3 +58,4 @@ Next session: 4.3 (video script)
 3.6 commit real index, manual sanity check, scale benchmark
 4.1 comprehensive README with architecture, benchmarks, and ranking comparison
 4.2 GenAI critical evaluation drawn from decisions log (14 verbatim AI-note events)
+4.3 word-for-word video script (4:30 target) + demo_runner teleprompter

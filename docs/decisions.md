@@ -509,3 +509,17 @@ A running log of design choices made during the build. Each entry captures the d
 **No invented entries.** The Pre-flight count was 14, matched the actual Section 3 entries on output, and was authorised by the user before writing began. The evaluation does not generalise beyond what these 14 events evidence; Section 4's three-category breakdown ("platform compatibility traps", "type-correctness issues", "design-judgement calls") maps every event to exactly one category with examples cited by name.
 
 **Section 8 appendix**: reproduces the substantive content of `docs/decisions.md` with all 14 AI-note sub-bullets verbatim; the surrounding architectural rationale prose is condensed in the appendix to keep `GENAI_EVALUATION.md` under 200 lines while still containing every AI-correction event as primary evidence. The full original `docs/decisions.md` is committed in the repository.
+
+## 2026-05-19 — Video script complete (4:30 target)
+
+**Decision**: `docs/video_script.md` is a word-for-word script with second-level timestamps targeting a **4:30 total run-time** with a hard 4:50 ceiling. Pacing follows the brief's section allocations: 0:15 intro / 2:00 live demo / 1:15 code walkthrough / 0:30 tests-lint-CI / 0:30 GenAI section.
+
+**Measured readback estimate**: 398 spoken words across `> ...` blockquote lines. At 120 wpm (slow/clear pace): 3 minutes 19 seconds of pure narration. At 140 wpm (natural pace): 2 minutes 51 seconds. Plus approximately 70 seconds of demo action (command typing, one polite-pause wait during `build`, watching output). **Total run-time: 4:10 to 4:30**, comfortably inside the 4:50 ceiling.
+
+**Two AI-failure events cited in the GenAI section**, both quoted from `GENAI_EVALUATION.md` Section 3:
+- **`cmd.Cmd.emptyline` typed as `-> None`**: mypy flagged the override against the typeshed stub which declares `-> bool`. Changed to return `False`.
+- **`python -c` with PowerShell variable interpolation**: stripped embedded double quotes, Python crashed with `SyntaxError: parenthesis never closed`. Switched the launcher to pipe via stdin to `python -`.
+
+**Companion teleprompter**: `scripts/demo_runner.py` is a stdin-press-Enter helper that reveals each demo command one at a time on a side monitor. It does not drive the search shell directly — the presenter types each command manually into a separate `(search)` window so the recording feels organic rather than scripted. The teleprompter exists solely to remove "what command was next?" pauses from the live demo.
+
+**Trimming policy** if a take runs over 4:40: cut from the code walkthrough commentary first (keep each file open and one short label per file). Live demo commands are non-negotiable. The 0:30 GenAI section is also non-negotiable because it carries the 15% mark and must include at least one concrete AI-failure example with the tool-output quoted.
