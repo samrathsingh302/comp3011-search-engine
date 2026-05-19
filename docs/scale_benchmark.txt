@@ -1,0 +1,27 @@
+| subset_size | query | median_ms |
+|---|---|---|
+| 5 | `love` | 0.045 |
+| 5 | `life` | 0.062 |
+| 5 | `world` | 0.064 |
+| 5 | `good friends` | 0.026 |
+| 5 | `indifference` | 0.003 |
+| 10 | `love` | 0.091 |
+| 10 | `life` | 0.200 |
+| 10 | `world` | 0.204 |
+| 10 | `good friends` | 0.080 |
+| 10 | `indifference` | 0.004 |
+| 25 | `love` | 0.258 |
+| 25 | `life` | 0.309 |
+| 25 | `world` | 0.159 |
+| 25 | `good friends` | 0.170 |
+| 25 | `indifference` | 0.023 |
+| 50 | `love` | 0.624 |
+| 50 | `life` | 0.762 |
+| 50 | `world` | 0.415 |
+| 50 | `good friends` | 0.393 |
+| 50 | `indifference` | 0.088 |
+| 214 | `love` | 2.431 |
+| 214 | `life` | 2.623 |
+| 214 | `world` | 0.764 |
+| 214 | `good friends` | 0.855 |
+| 214 | `indifference` | 0.169 |

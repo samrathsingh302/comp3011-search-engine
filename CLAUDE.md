@@ -30,13 +30,14 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 3.5 (end-to-end integration tests + coverage push)
-Test count: 127 (25 crawler, 33 indexer, 10 storage, 29 search, 23 cli, 4 integration, 2 smoke + 1 implicit)
-Coverage: 100% across every src/ module. 11 lines `# pragma: no cover`'d on defensive branches with one-line justifications in decisions.md.
-Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes.
-HTML fixtures captured. data/index.json exists on disk (~4.21 MB, 4729 terms, 214 pages); commit belongs to Session 3.6.
-Integration tests use captured fixtures (no real network) and exercise the full pipeline: build -> save -> load -> search -> format.
-Next session: 3.6 (commit real index + scale benchmark)
+Last session completed: 3.6 (commit real index + scale benchmark). End of Day 3.
+Test count: 127. Coverage 100% on all src/ modules (11 lines pragma'd on defensive branches).
+Linter: ruff clean. Type checker: mypy clean. Deps pinned.
+data/index.json COMMITTED (~4.2 MB, 4729 terms, 214 pages).
+docs/sample_output.txt captured from `python -m src.main` driving the load/print/find/stats sequence (234 lines).
+docs/scale_benchmark.txt holds median timings across {5, 10, 25, 50, 214}-doc subsets for 5 canonical queries.
+At 214 docs the slowest query (TF-IDF on `life`) is 2.6 ms median; rare-term query (`indifference`) is 0.17 ms.
+Next session: 4.1 (README)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -56,3 +57,4 @@ Next session: 3.6 (commit real index + scale benchmark)
 3.3 interactive cmd.Cmd shell with --ranking flag on find
 3.4 CLI test suite with mocked Crawler and engine
 3.5 end-to-end integration tests + coverage push to 100%
+3.6 commit real index, manual sanity check, scale benchmark

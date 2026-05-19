@@ -439,3 +439,48 @@ A running log of design choices made during the build. Each entry captures the d
 - **Delete the defensive branches entirely** (would push the assumption "this can't happen" out of the code and into the reader's head, where it would be forgotten).
 
 **Rationale**: Defensive code that survives lint and type-check and has a one-line explanation of why it cannot be reached is the best of three bad options. The pragmas are auditable: a future reader can grep `# pragma: no cover` to find every "you don't have to think about this" branch and decide whether the justification still holds.
+
+## 2026-05-19 — Sample queries chosen for benchmark
+
+**Decision**: The canonical set is `["love", "life", "world", "good friends", "indifference"]`. The README and the video reuse the same five queries so the marker can cross-reference performance, ranking output, and snippet quality without flipping between three different query sets.
+
+**Why these five**:
+- **`love`, `life`, `world`** are single-term high-frequency tokens on `quotes.toscrape.com`. They stress the posting-list-length end of the cost curve: their TF-IDF / BM25 scoring loop runs over the most postings of any query the marker is likely to try. If these queries are fast, everything else is too.
+- **`good friends`** is the canonical multi-term query for the corpus (Mark Twain quote: "Good friends, good books, and a sleepy conscience: this is the ideal life"). Exercises AND intersection plus title boost plus proximity boost in one shot.
+- **`indifference`** is single-term but rare (only 11 documents). Demonstrates that scoring time is dominated by posting-list length, not corpus size: the same query stays sub-millisecond even at the full 214-doc corpus.
+
+## 2026-05-19 — Empirical scaling on quotes.toscrape.com
+
+**Decision**: `scripts/scale_benchmark.py` rebuilds the index over 5-, 10-, 25-, 50-, and full-214 document subsets, runs each of the canonical queries 10 times under `time.perf_counter`, and records the **median** of the 10 runs (median, not mean, so a single GC pause or OS scheduler hiccup does not skew a row). Output is saved to `docs/scale_benchmark.txt` for the README's benchmark table.
+
+**Observed results** (median wall-clock find() latency, all values in milliseconds, captured 2026-05-19 on Python 3.13.7 / Windows 11):
+
+| subset_size | query | median_ms |
+|---|---|---|
+| 5 | `love` | 0.045 |
+| 5 | `life` | 0.062 |
+| 5 | `world` | 0.064 |
+| 5 | `good friends` | 0.026 |
+| 5 | `indifference` | 0.003 |
+| 10 | `love` | 0.091 |
+| 10 | `life` | 0.200 |
+| 10 | `world` | 0.204 |
+| 10 | `good friends` | 0.080 |
+| 10 | `indifference` | 0.004 |
+| 25 | `love` | 0.258 |
+| 25 | `life` | 0.309 |
+| 25 | `world` | 0.159 |
+| 25 | `good friends` | 0.170 |
+| 25 | `indifference` | 0.023 |
+| 50 | `love` | 0.624 |
+| 50 | `life` | 0.762 |
+| 50 | `world` | 0.415 |
+| 50 | `good friends` | 0.393 |
+| 50 | `indifference` | 0.088 |
+| 214 | `love` | 2.431 |
+| 214 | `life` | 2.623 |
+| 214 | `world` | 0.764 |
+| 214 | `good friends` | 0.855 |
+| 214 | `indifference` | 0.169 |
+
+**Commentary**: The growth is approximately linear in posting-list length, which is the textbook expectation for a TF-IDF scorer that has not been skip-pointer-accelerated. `love` and `life` scale up to ~2.5 ms at the full corpus because they hit most of the 214 documents; `world` has fewer postings (it appears in the corpus less often), so its 0.76 ms at 214 documents is closer to the multi-term `good friends` cost (which the shortest-list-first AND intersection cuts to the size of the smaller term's posting list, here roughly 20 documents). `indifference` stays under 0.2 ms across every subset because its posting list is bounded by 11 — most of the scoring time is overhead, not arithmetic. **At this corpus size the search engine is comfortably interactive**: the slowest query is under 3 ms, three orders of magnitude faster than the brief's politeness window. No skip-pointer optimisation is justified.
