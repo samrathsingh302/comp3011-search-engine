@@ -30,14 +30,14 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 2.6 (TF-IDF with title boost). End of Day 2.
-Test count: 80 (24 crawler, 30 indexer, 10 storage, 14 search, 2 smoke)
-Coverage: crawler 96%, indexer 93%, storage 94%, search 97%; total project coverage 95.10%.
+Last session completed: 3.1 (Okapi BM25 ranking with Robertson-Walker +0.5 smoothing)
+Test count: 83 (24 crawler, 30 indexer, 10 storage, 17 search, 2 smoke)
+Coverage: crawler 96%, indexer 93%, storage 94%, search 97%; total project coverage 95.37%.
 Linter: ruff clean. Type checker: mypy clean. Deps pinned. CLAUDE.md tracked as project notes.
 HTML fixtures captured: tests/fixtures/page1.html (11021 B), page2.html (13699 B), page3.html (9987 B).
 real_crawl_completed=true. data/index.json exists on disk (~4.21 MB, 4729 terms, 214 pages). Index file is NOT yet committed — that commit belongs to Session 3.6.
-Ranker: TF-IDF (smoothed IDF: log((N+1)/(df+1))+1) with 2.0x title boost via linear partial-hit scaling. BM25 dispatch wired but raises NotImplementedError until Session 3.1.
-Next session: 3.1 (BM25 ranking)
+Rankers: both TF-IDF (smoothed log((N+1)/(df+1))+1) and BM25 (Robertson-Walker with +0.5 smoothing, k1=1.5, b=0.75, lazy-cached avgdl) wired and selectable via constructor `ranking=` parameter. 2.0x title boost applied multiplicatively after base score.
+Next session: 3.2 (proximity boost + real text snippets + suggestions)
 
 ## Session log
 1.1 scaffold + commit helper
@@ -52,3 +52,4 @@ Next session: 3.1 (BM25 ranking)
 2.4 real-crawl launcher script + live crawl (214 pages, 4729 terms, 21.9 min)
 2.5 SearchEngine with single-term lookup and conjunctive AND
 2.6 TF-IDF with 2.0x title boost
+3.1 Okapi BM25 ranking (Robertson Walker 1994)

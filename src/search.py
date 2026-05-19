@@ -66,6 +66,8 @@ class SearchEngine:
             )
         self.index = index
         self.ranking = ranking
+        # Lazily cached on first BM25 call; see `_get_avg_doc_length`.
+        self._avg_doc_length: float | None = None
 
     def normalise_query(self, query: str) -> list[str]:
         """Tokenise `query` with the same options the index was built with."""
@@ -118,6 +120,62 @@ class SearchEngine:
             word, self.index.vocabulary, n=n, cutoff=0.7
         )
 
+    def _get_avg_doc_length(self) -> float:
+        """Mean `word_count` across indexed documents, cached after first call.
+
+        The cache is invalidation-free because the InvertedIndex is treated
+        as immutable from the SearchEngine's point of view; rebuilding the
+        engine after re-indexing is the supported path. Always returns at
+        least 1.0 so the BM25 length-normalisation term cannot divide by
+        zero on a freshly-constructed empty index.
+        """
+        if self._avg_doc_length is not None:
+            return self._avg_doc_length
+        word_counts = [
+            int(doc.get("word_count", 0))
+            for doc in self.index.documents.values()
+        ]
+        avg = sum(word_counts) / len(word_counts) if word_counts else 1.0
+        self._avg_doc_length = max(1.0, avg)
+        return self._avg_doc_length
+
+    def _bm25_score(
+        self,
+        url: str,
+        terms: list[str],
+        posting_lists: dict[str, dict[str, dict[str, Any]]],
+    ) -> float:
+        """Okapi BM25 (Robertson and Walker 1994) with the +0.5 IDF smoothing.
+
+        Formula per term: `idf(t) * tf * (k1 + 1) / (tf + k1 * (1 - b + b * dl / avgdl))`
+        where `idf(t) = log(1 + (N - df + 0.5) / (df + 0.5))`. `k1` and `b` are
+        the standard `BM25_K1 = 1.5` and `BM25_B = 0.75`. `dl` is the document
+        length in tokens (we use `word_count` from the indexer-stored metadata).
+
+        The +0.5 smoothing terms in the IDF numerator and denominator are part
+        of the original paper and are essential: without them the IDF of a
+        term that appears in every document goes negative, which would flip
+        the sign of the contribution.
+        """
+        n_docs = max(1, self.index.document_count)
+        avgdl = self._get_avg_doc_length()
+        doc_len = max(
+            1,
+            int(self.index.documents.get(url, {}).get("word_count", 1)),
+        )
+        score = 0.0
+        for term in terms:
+            postings = posting_lists[term]
+            df = len(postings)
+            tf = int(postings[url].get("frequency", 0))
+            idf = math.log(1 + (n_docs - df + 0.5) / (df + 0.5))
+            numerator = tf * (BM25_K1 + 1)
+            denominator = tf + BM25_K1 * (
+                1 - BM25_B + BM25_B * doc_len / avgdl
+            )
+            score += idf * (numerator / denominator)
+        return score
+
     def _tfidf_score(
         self,
         url: str,
@@ -158,12 +216,7 @@ class SearchEngine:
         if self.ranking == "tfidf":
             base = self._tfidf_score(url, terms, posting_lists)
         elif self.ranking == "bm25":
-            # BM25 maths arrives in Session 3.1; until then, the dispatch
-            # surface is wired but calling find() with ranking="bm25"
-            # raises so callers do not get a silently-wrong score.
-            raise NotImplementedError(
-                "BM25 ranking arrives in Session 3.1"
-            )
+            base = self._bm25_score(url, terms, posting_lists)
         else:  # pragma: no cover - __init__ validation prevents this branch
             raise RuntimeError(f"unhandled ranking: {self.ranking}")
 

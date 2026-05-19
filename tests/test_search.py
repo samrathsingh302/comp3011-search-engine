@@ -97,11 +97,6 @@ class TestRanking:
         assert SearchEngine(small_index, ranking="tfidf").ranking == "tfidf"
         assert SearchEngine(small_index, ranking="bm25").ranking == "bm25"
 
-    def test_bm25_find_raises_not_implemented_until_3_1(self, small_index: InvertedIndex) -> None:
-        """Until Session 3.1 lands BM25, calling find() with ranking=bm25 must raise loudly."""
-        engine = SearchEngine(small_index, ranking="bm25")
-        with pytest.raises(NotImplementedError, match="Session 3.1"):
-            engine.find("cat")
 
 
 class TestTfIdf:
@@ -146,3 +141,70 @@ class TestTfIdf:
         assert results[0].url == "http://title-hit/"
         # With both at tf=1, df=2, the title-hit score must be roughly 2.0x the body-only score.
         assert results[0].score == pytest.approx(2.0 * results[1].score, rel=0.01)
+
+
+class TestBm25:
+    def test_bm25_scores_differ_from_tfidf(self, small_index: InvertedIndex) -> None:
+        """TF-IDF and BM25 use different formulas; same query must yield different scores."""
+        tfidf_engine = SearchEngine(small_index, ranking="tfidf")
+        bm25_engine = SearchEngine(small_index, ranking="bm25")
+        tfidf_results = tfidf_engine.find("cat")
+        bm25_results = bm25_engine.find("cat")
+        # Same set of matching URLs
+        assert {r.url for r in tfidf_results} == {r.url for r in bm25_results}
+        # But the score numbers diverge under different formulas
+        tfidf_top = max(r.score for r in tfidf_results)
+        bm25_top = max(r.score for r in bm25_results)
+        assert tfidf_top != pytest.approx(bm25_top, rel=1e-6)
+
+    def test_bm25_length_normalises(self) -> None:
+        """At equal tf, BM25 ranks the shorter document above the longer one."""
+        idx = InvertedIndex()
+        idx.add_document(
+            "http://short/",
+            "<html><body>cat</body></html>",
+        )
+        long_filler = " ".join(["filler"] * 200)
+        idx.add_document(
+            "http://long/",
+            f"<html><body>cat {long_filler}</body></html>",
+        )
+        engine = SearchEngine(idx, ranking="bm25")
+        results = engine.find("cat")
+        assert len(results) == 2
+        short_score = next(r.score for r in results if r.url == "http://short/")
+        long_score = next(r.score for r in results if r.url == "http://long/")
+        assert short_score > long_score
+
+    def test_avg_doc_length_is_cached(self, small_index: InvertedIndex) -> None:
+        """`_get_avg_doc_length` memoises after the first call.
+
+        Mutate the underlying documents after caching and confirm the cached
+        value sticks. (Mutating the index after engine construction is not a
+        supported path in production; this test asserts the cache, not policy.)
+        """
+        engine = SearchEngine(small_index, ranking="bm25")
+        first = engine._get_avg_doc_length()
+        small_index.documents["http://injected/"] = {
+            "word_count": 999_999,
+            "title": "x",
+            "fetched_at": "2026-05-19T00:00:00+00:00",
+            "body_excerpt": "",
+        }
+        second = engine._get_avg_doc_length()
+        assert second == first
+
+    def test_switching_ranking_changes_engine_behaviour(self, small_index: InvertedIndex) -> None:
+        """A given query produces different per-document scores under tfidf vs bm25."""
+        tfidf_engine = SearchEngine(small_index, ranking="tfidf")
+        bm25_engine = SearchEngine(small_index, ranking="bm25")
+        assert tfidf_engine.ranking == "tfidf"
+        assert bm25_engine.ranking == "bm25"
+        tfidf_scores = {r.url: r.score for r in tfidf_engine.find("cat")}
+        bm25_scores = {r.url: r.score for r in bm25_engine.find("cat")}
+        assert set(tfidf_scores) == set(bm25_scores)
+        # At least one URL has different scores under the two rankings
+        assert any(
+            tfidf_scores[url] != pytest.approx(bm25_scores[url], rel=1e-6)
+            for url in tfidf_scores
+        )
