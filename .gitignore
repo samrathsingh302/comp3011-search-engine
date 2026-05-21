@@ -42,3 +42,7 @@ nltk_data/
 # Instructor-provided verifier tool; reports under docs/ ARE tracked.
 comp3011-verifier/
 comp3011-verifier.zip
+
+# Recording kit (external prep tooling); cheatsheet under docs/ IS tracked.
+video-recording-kit/
+video-recording-kit.zip

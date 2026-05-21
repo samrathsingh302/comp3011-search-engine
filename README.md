@@ -278,6 +278,12 @@ The absolute scores are not directly comparable across rankers: TF-IDF scores su
 
 This project was developed in close collaboration with an AI pair-programmer (Claude Code). The full disclosure of how the AI was used, where it helped, where it made mistakes that needed correcting, and what the developer learned by working with it lives in [`GENAI_EVALUATION.md`](GENAI_EVALUATION.md). Every line of code, every test, and every documentation paragraph in this repository can be explained by the developer; the AI's contribution is documented honestly rather than hidden.
 
+## Submission
+
+- **Video** (Unlisted YouTube): https://www.youtube.com/watch?v=Oybn5CmfRSU
+- **GitHub** (public): https://github.com/samrathsingh302/comp3011-search-engine
+- **Compiled inverted index**: [`data/index.json`](data/index.json) is committed in this repo (~4.2 MB, 214 pages, 4,729 terms; tag `v0.9-tests-passing`). The marker can clone, `pip install -r requirements-dev.txt`, run `pytest`, and run `python -m src.main` → `load` → `find good friends` without re-crawling.
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
