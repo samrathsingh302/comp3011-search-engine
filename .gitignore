@@ -46,3 +46,6 @@ comp3011-verifier.zip
 # Recording kit (external prep tooling); cheatsheet under docs/ IS tracked.
 video-recording-kit/
 video-recording-kit.zip
+
+# Local submission staging (PDF + index copy); not part of the repo deliverable.
+submission/

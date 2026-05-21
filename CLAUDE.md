@@ -30,13 +30,22 @@ Day 4 start: real `data/index.json` committed.
 Day 4 end: GitHub Actions green on Python 3.10/3.11/3.12, mypy clean.
 
 ## Current State
-Last session completed: 4.4 (GitHub push verified; CI green on all three Python versions; v1.0-submission tag pushed)
-Test count: 127. Coverage 100% on all src/ modules. ruff + mypy clean.
-Repo: https://github.com/samrathsingh302/comp3011-search-engine (PUBLIC). Repo name differs from v7.1 spec's `comp3011-cw2`; the repo was created Day 1 under the more descriptive name and was kept rather than splitting history.
-CI: run 26102490346 on commit 74b098c (== v1.0-submission tag) succeeded on Python 3.10 (24s), 3.11 (21s), 3.12 (20s).
-Tags pushed: v0.2-crawler, v0.3-indexer-storage, v0.4-search, v0.5-cli, v0.9-tests-passing, v1.0-submission.
-Postamble edits (decisions.md "## CI green ..." entry + this CLAUDE.md update) are staged uncommitted because the 4.4 spec did not call for `commit_session`; the v1.0-submission tag stays on the pre-postamble commit as the canonical submission marker. Future sessions can fold these edits in.
-Next session: 4.5 (recording walkthrough)
+**PROJECT COMPLETE. Submitted on Minerva 2026-05-21.**
+
+Final state at submission:
+- Submission tag: `v1.0.1-submitted` on commit `15c0dec`
+- Video (Unlisted YouTube): https://www.youtube.com/watch?v=Oybn5CmfRSU
+- Public repo: https://github.com/samrathsingh302/comp3011-search-engine
+- 127 tests passing, 100% line coverage, ruff + mypy both clean, CI green on Python 3.10/3.11/3.12
+- 7 semantic tags: v0.2-crawler, v0.3-indexer-storage, v0.4-search, v0.5-cli, v0.9-tests-passing, v1.0-submission, v1.0.1-submitted
+- 31 commits in Conventional Commits format (including this closing commit)
+- data/index.json committed (~4.2 MB, 214 pages, 4729 terms, v0.9-tests-passing tag)
+
+Minerva upload:
+- COMP3011_CW2_Submission_Samrath_Singh.pdf (one-page summary with links + verification commands)
+- index.json (4.21 MB, the compiled inverted index)
+
+No further sessions planned. The closing entry in docs/decisions.md is dated 2026-05-21.
 
 ## Session log
 1.1 scaffold + commit helper
@@ -61,3 +70,5 @@ Next session: 4.5 (recording walkthrough)
 4.2 GenAI critical evaluation drawn from decisions log (14 verbatim AI-note events)
 4.3 word-for-word video script (4:30 target) + demo_runner teleprompter
 4.4 GitHub push, CI green on Python 3.10/3.11/3.12, v1.0-submission tag pushed
+4.5 (manual) silent screen recording + voiceover dress rehearsal via docs/recording_cheatsheet.md
+4.6 video uploaded to YouTube Unlisted, README submission link, v1.0.1-submitted tagged, Minerva submitted

@@ -539,3 +539,30 @@ A running log of design choices made during the build. Each entry captures the d
 **Repo state**: `samrathsingh302/comp3011-search-engine` (public). Six semantic tags at submission: `v0.2-crawler`, `v0.3-indexer-storage`, `v0.4-search`, `v0.5-cli`, `v0.9-tests-passing`, `v1.0-submission`.
 
 **Note on repo name**: the original v7.1 spec assumed a fresh `gh repo create comp3011-cw2 --public ...` step at this point. The repo had already been created on Day 1 under the more descriptive name `comp3011-search-engine`, so the create step was skipped; everything downstream (push, tag, CI verification) happened on the existing public repo with no loss of history.
+
+## 2026-05-21 — Submitted on Minerva
+
+**Decision**: Final submission landed on Minerva on 2026-05-21. Two files uploaded:
+- `COMP3011_CW2_Submission_Samrath_Singh.pdf` (one-page A4 summary with author block, clickable YouTube and GitHub links, copy-paste-ready verification commands, project-summary bullets, lecture references, and the GenAI declaration pointing at `GENAI_EVALUATION.md`).
+- `index.json` (the 4.21 MB compiled inverted index from the 2026-05-18 live crawl of `quotes.toscrape.com`; identical bytes to `data/index.json` in the repo at tag `v0.9-tests-passing`).
+
+**Repo state at submission**:
+- Public repo: https://github.com/samrathsingh302/comp3011-search-engine
+- Submission tag: `v1.0.1-submitted` on commit `15c0dec` ("docs: record submission video link in README")
+- Seven semantic tags: `v0.2-crawler`, `v0.3-indexer-storage`, `v0.4-search`, `v0.5-cli`, `v0.9-tests-passing`, `v1.0-submission`, `v1.0.1-submitted`
+- CI: green on Python 3.10 / 3.11 / 3.12 at submission ([latest run](https://github.com/samrathsingh302/comp3011-search-engine/actions))
+- Tests: 127 passing, 100% line coverage (11 defensive lines `# pragma: no cover`'d with one-line justifications)
+- Lint: ruff clean. Type checker: mypy clean
+- Video (Unlisted YouTube): https://www.youtube.com/watch?v=Oybn5CmfRSU
+
+**Marker quick-start** (copy-pasted into the submission PDF):
+```
+git clone https://github.com/samrathsingh302/comp3011-search-engine
+cd comp3011-search-engine
+python -m venv .venv ; .\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+pytest --cov=src      # 127 tests, 100% coverage
+python -m src.main    # then: load, print indifference, find good friends
+```
+
+**Project complete.** This closing entry is the last in the decisions log. The repo is frozen at `v1.0.1-submitted` for the marker; any post-submission changes go in a separate branch or after the grade is returned.
